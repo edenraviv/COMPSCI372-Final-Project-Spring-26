@@ -54,17 +54,12 @@ class KalshiClient:
         r.raise_for_status()
         return r.json()
 
-    def get_markets(self, status = "closed", limit: int = 200, cursor = None) -> dict:
-        
-        params = {"status": status, "limit": limit}
-        if cursor:
-            params["cursor"] = cursor
-        return self.get("/markets", params)
-    
-    def get_historical_markets(self, status = "closed", limit: int = 200, cursor = None) -> dict:
-        params = {"status": status, "limit": limit}
-        if cursor:
-            params["cursor"] = cursor
+    def get_markets(self, status, limit, cursor, min_created_ts, max_created_ts) -> dict:
+        params = {"status": status, 
+                  "limit": limit,
+                  "min_created_ts": min_created_ts,
+                  "max_created_ts": max_created_ts,
+                  "cursor": cursor}
         return self.get("/markets", params)
     
     def get_event(self, event_ticker):
