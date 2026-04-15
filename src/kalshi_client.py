@@ -8,6 +8,7 @@ import requests
 from dotenv import load_dotenv
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
+from datetime import datetime, timezone
 
 load_dotenv("apikey.env")
 
@@ -61,6 +62,28 @@ class KalshiClient:
                   "max_created_ts": max_created_ts,
                   "cursor": cursor}
         return self.get("/markets", params)
+        
+    def parse_cutoff(self, response: dict) -> int:
+        """
+        Parses the historical cutoff response and returns the market_settled_ts
+        as a Unix timestamp (seconds).
+        """
+        ts_string = response["market_settled_ts"]
+        dt = datetime.fromisoformat(ts_string.replace("Z", "+00:00"))
+        return int(dt.timestamp())
+        
+    def get_historical_cutoff(self):
+        response = self.get("/historical/cutoff")
+        parsed_cutoff = self.parse_cutoff(response)
+        return parsed_cutoff
     
+    def get_all_markets(self):
+        cutoff = self.get_historical_cutoff()
+        print(cutoff)
+        
     def get_event(self, event_ticker):
-        return self.get(f"/events/{event_ticker}")
+        return self.get(f"/events/{event_ticker}").json()
+
+
+client = KalshiClient()
+client.get_all_markets()
