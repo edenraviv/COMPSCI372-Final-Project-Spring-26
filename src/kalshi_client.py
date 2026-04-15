@@ -61,8 +61,11 @@ class KalshiClient:
             params["cursor"] = cursor
         return self.get("/markets", params)
     
-    def get_candlesticks(self, ticker):
-        return self.get(f"/markets/{ticker}/candlesticks")
+    def get_historical_markets(self, status = "closed", limit: int = 200, cursor = None) -> dict:
+        params = {"status": status, "limit": limit}
+        if cursor:
+            params["cursor"] = cursor
+        return self.get("/markets", params)
     
     def get_event(self, event_ticker):
         return self.get(f"/events/{event_ticker}")

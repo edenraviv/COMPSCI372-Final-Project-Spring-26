@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 def is_clean_binary_market(m: dict) -> bool:
     if (m.get("status") != "closed" and
         m.get("status") != "determined" and 
-        m.get("status") != "settleed"):
+        m.get("status") != "settled"):
         return False
 
     if m.get("market_type") != "binary":
