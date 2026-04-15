@@ -1,0 +1,131 @@
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.*
+*.pem
+*.key
+secrets/
+
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.virtualenv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# ========================
+# Data (raw & processed)
+# ========================
+data/raw/
+data/processed/
+data/vector_store/
+
+# Allow directory structure but not contents
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/vector_store/.gitkeep
+
+# ========================
+# Documents (ingested)
+# ========================
+documents/news/
+documents/events/
+
+!documents/news/.gitkeep
+!documents/events/.gitkeep
+
+# ========================
+# Models & Embeddings
+# ========================
+models/checkpoints/
+models/embeddings/
+
+!models/checkpoints/.gitkeep
+!models/embeddings/.gitkeep
+
+# Common model file formats
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+*.gguf
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+
+# ========================
+# Vector DBs & Caches
+# ========================
+*.faiss
+*.index
+chroma/
+chromadb/
+qdrant/
+*.cache
+
+# ========================
+# Logs & Monitoring
+# ========================
+logs/
+*.log
+*.out
+runs/           # TensorBoard runs
+wandb/
+mlruns/         # MLflow
+
+# ========================
+# OS & Editor
+# ========================
+.DS_Store
+Thumbs.db
+.idea/
+
+# VSCode — keep workspace settings, ignore personal/local overrides
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+*.code-workspace
+
+*.swp
+*.swo
+*~
+
+# ========================
+# Testing & Coverage
+# ========================
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.xml
+
+# ========================
+# Misc
+# ========================
+*.tmp
+*.bak
+*.orig
