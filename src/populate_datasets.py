@@ -17,12 +17,16 @@ for m in markets:
     print(m["market_type"])
     print(extract_market_question(m))
     print("---")
+    
+####### WRITE RAW DATA TO JSON #####
 
 # 3. Try building samples from that same batch
 samples = build_resolved_samples(response)
 print(f"\nSamples built: {len(samples)}")
 for s in samples:
     print(s.market_id, s.label, s.rag_query)
+    
+####### WRITE PROCESSED DATA TO JSON #####
 
 # 4. If rag_query is still empty, inspect the parent event
 if markets:
