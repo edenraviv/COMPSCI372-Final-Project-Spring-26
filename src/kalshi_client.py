@@ -77,13 +77,48 @@ class KalshiClient:
         parsed_cutoff = self.parse_cutoff(response)
         return parsed_cutoff
     
-    def get_all_markets(self):
-        cutoff = self.get_historical_cutoff()
-        print(cutoff)
+    def _paginate(self, path: str, params: dict) -> list[dict]:
+        """
+        Generic pagination handler for any list endpoint.
+        Follows cursors until exhausted.
+        """
+        all_items = []
+        cursor = None
+        key = "markets"  # the data array key in the response
+
+        while True:
+            if cursor:
+                params["cursor"] = cursor
+            response = self.get(path, params)
+            batch = response.get(key, [])
+            all_items.extend(batch)
+            print(f"Fetched {len(batch)} | Total so far: {len(all_items)}")
+            cursor = response.get("cursor")
+            if not cursor:
+                break
+
+        return all_items
+
+    def get_all_training_data(self) -> list[dict]:
+        """
+        Fetches all resolved political markets from both endpoints and merges.
+        """
+        historical = self._paginate("/historical/markets", {
+        "category": "Politics",
+            "limit": 1000,
+        })
+
+        recent = self._paginate("/markets", {
+            "category": "Politics",
+            "status": "finalized",
+            "limit": 1000,
+        })
+
+        # Deduplicate on ticker
+        all_markets = {m["ticker"]: m for m in historical + recent}
+        print(f"Historical: {len(historical)} | Recent: {len(recent)} | Unique: {len(all_markets)}")
+
+        return list(all_markets.values())
         
     def get_event(self, event_ticker):
         return self.get(f"/events/{event_ticker}").json()
-
-
-client = KalshiClient()
-client.get_all_markets()
