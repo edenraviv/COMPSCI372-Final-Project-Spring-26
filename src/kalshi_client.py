@@ -66,7 +66,19 @@ class KalshiClient:
         return r.json()
 
     def get_markets(self):
-        return self.get("/markets")
-
+        params = {
+            "category": "Politics",  # or check if Kalshi uses "political" — worth printing available values
+            "status": "finalized",   # only resolved markets for training labels
+            "limit": 200,
+        }
+        data = self.get("/markets", params)
+        '''for market in data["markets"]:
+              print(f"RULES:{market["rules_primary"]}")'''
+        return data
+    
+    
     def get_candlesticks(self, ticker):
         return self.get(f"/markets/{ticker}/candlesticks")
+    
+    def get_event(self, ticker):
+        return self.get(f"/markets/{ticker}")

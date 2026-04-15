@@ -96,14 +96,22 @@ def extract_market_question(m: dict) -> str:
     Builds a clean, human-readable question from Kalshi market data.
     """
 
-    # 1. try subtitles first (best signal)
+    #try rules
+    rules = m.get("rules_primary", "").strip()
+    if rules:
+        return rules
+    
+    # try subtitles 
     yes_sub = m.get("yes_sub_title")
     no_sub = m.get("no_sub_title")
 
     if yes_sub:
         return yes_sub
+    
+    if no_sub:
+        return no_sub
 
-    # 2. fallback to title
+    # fallback to title (deprecated)
     title = m.get("title", "")
 
     # 3. fallback to custom strike structure

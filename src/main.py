@@ -8,4 +8,8 @@ client = KalshiClient()
 
 markets = client.get_markets()
 
-print_markets(markets)
+print(markets)
+
+'''
+event = client.get_event("KXMVECROSSCATEGORY-S2026E6CB6453B27-CBC97A8B597")
+print(event)'''
