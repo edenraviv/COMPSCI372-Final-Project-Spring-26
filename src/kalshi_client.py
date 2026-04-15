@@ -1,12 +1,6 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv("apikey.env")
-
-API_KEY_ID = os.getenv("API_KEY_ID")
-PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH")
-BASE_URL = os.getenv("BASE_URL")
-
 import os
 import time
 import base64
@@ -56,29 +50,19 @@ class KalshiClient:
     def get(self, path, params=None):
         url = self.base_url + path
         headers = self._sign_request("GET", path)
-
         r = requests.get(url, headers=headers, params=params)
-
-        print("STATUS CODE:", r.status_code)
-        print("HEADERS:", r.headers)
-        print("RESPONSE TEXT:", repr(r.text[:300]))
-
+        r.raise_for_status()
         return r.json()
 
-    def get_markets(self):
-        params = {
-            "category": "Politics",  # or check if Kalshi uses "political" — worth printing available values
-            "status": "finalized",   # only resolved markets for training labels
-            "limit": 200,
-        }
-        data = self.get("/markets", params)
-        '''for market in data["markets"]:
-              print(f"RULES:{market["rules_primary"]}")'''
-        return data
-    
+    def get_markets(self, status = "closed", limit: int = 200, cursor = None) -> dict:
+        
+        params = {"status": status, "limit": limit}
+        if cursor:
+            params["cursor"] = cursor
+        return self.get("/markets", params)
     
     def get_candlesticks(self, ticker):
         return self.get(f"/markets/{ticker}/candlesticks")
     
-    def get_event(self, ticker):
-        return self.get(f"/markets/{ticker}")
+    def get_event(self, event_ticker):
+        return self.get(f"/events/{event_ticker}")

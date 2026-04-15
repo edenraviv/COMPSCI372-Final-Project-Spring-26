@@ -2,7 +2,9 @@ from schema import MarketFeatures
 from datetime import datetime, timezone
 
 def is_clean_binary_market(m: dict) -> bool:
-    if m.get("status") != "resolved":
+    if (m.get("status") != "closed" and
+        m.get("status") != "determined" and 
+        m.get("status") != "settleed"):
         return False
 
     if m.get("market_type") != "binary":
@@ -11,21 +13,12 @@ def is_clean_binary_market(m: dict) -> bool:
     if m.get("result") not in ["yes", "no"]:
         return False
 
-    if m.get("mve_collection_ticker") is not None:
-        return False
-
-    if m.get("mve_selected_legs"):
-        return False
-
-    if "KXMV" in m.get("ticker", ""):
-        return False
-
     return True
 
 
 def build_resolved_samples(markets_json):
     """
-    Builds training samples ONLY from resolved markets.
+    Builds training samples ONLY from closed/determined/settled  markets.
     IMPORTANT: assumes API returns final resolved state.
     """
 
