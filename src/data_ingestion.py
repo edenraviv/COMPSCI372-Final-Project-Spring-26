@@ -136,9 +136,13 @@ def extract_market_question(m: dict) -> str:
     return title
 
 def write_to_file(data, file):
-    with open(file, "a") as f:
+    with open(file, "w") as f:
         json.dump(data, f, indent=2)
         
-        
+def append_to_file(data, file):
+    with open(file, "a") as f:
+        json.dump(data, f, indent=2)
+
+
     
 
