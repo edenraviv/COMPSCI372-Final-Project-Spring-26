@@ -8,7 +8,7 @@ import requests
 from dotenv import load_dotenv
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-from datetime import datetime, timezone
+from datetime import datetime
 
 load_dotenv("apikey.env")
 
@@ -94,8 +94,6 @@ class KalshiClient:
             all_items.extend(batch)
             print(f"Fetched {len(batch)} | Total so far: {len(all_items)}")
             cursor = response.get("cursor")
-            if len(all_items) > 10000:
-                break
             if not cursor:
                 break
 

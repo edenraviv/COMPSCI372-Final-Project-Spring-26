@@ -26,7 +26,6 @@ def is_valid_market(m: dict, question) -> bool:
     
     return False
 
-
 def build_resolved_samples(markets_json : list[dict]):
     """
     Builds training samples ONLY from closed/determined/settled  markets.
@@ -66,6 +65,9 @@ def build_resolved_samples(markets_json : list[dict]):
 
             label=label
         ), m))
+        
+        if samples > 3000:
+            break
 
     return samples
 
@@ -128,7 +130,7 @@ def extract_market_question(m: dict) -> str:
     return title
 
 def write_to_file(data, file):
-    with open(file, "w") as f:
+    with open(file, "a") as f:
         json.dump(data, f, indent=2)
         
         

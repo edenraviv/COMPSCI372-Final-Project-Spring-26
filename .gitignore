@@ -37,8 +37,8 @@ wheels/
 # ========================
 # Data (raw & processed)
 # ========================
-data/raw/
-data/processed/
+data/raw_market_data.json
+data/processed_market_data.json
 data/vector_store/
 
 # Allow directory structure but not contents
