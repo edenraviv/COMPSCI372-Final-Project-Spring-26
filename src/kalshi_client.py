@@ -16,6 +16,7 @@ API_KEY_ID = os.getenv("API_KEY_ID")
 PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH")
 BASE_URL = os.getenv("BASE_URL")
 
+
 class KalshiClient:
     def __init__(self):
         self.api_key_id = API_KEY_ID
@@ -77,7 +78,7 @@ class KalshiClient:
         parsed_cutoff = self.parse_cutoff(response)
         return parsed_cutoff
     
-    def _paginate(self, path: str, params: dict) -> list[dict]:
+    def _paginate(self, path: str, params: dict, max_raw) -> list[dict]:
         """
         Generic pagination handler for any list endpoint.
         Follows cursors until exhausted.
@@ -96,20 +97,22 @@ class KalshiClient:
             cursor = response.get("cursor")
             if not cursor:
                 break
+            if len(all_items) > max_raw:
+                break
 
         return all_items
 
-    def get_all_training_data(self) -> list[dict]:
+    def get_all_training_data(self, max_raw =750000) -> list[dict]:
         """
         Fetches all resolved political markets from both endpoints and merges.
         """
         historical = self._paginate("/historical/markets", {
             "limit": 1000
-        })
+        }, max_raw)
 
         recent = self._paginate("/markets", {
-            "limit": 1000,
-        })
+            "limit": 1000, 
+        }, max_raw)
 
         # Deduplicate on ticker
         all_markets = {m["ticker"]: m for m in historical + recent}

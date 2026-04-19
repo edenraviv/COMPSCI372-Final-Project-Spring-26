@@ -1,6 +1,8 @@
 from schema import MarketFeatures
 import json
 
+MAX_SAMPLES = 3000
+
 def is_valid_market(m: dict, question) -> bool:
     if (m.get("status") != "closed" and
         m.get("status") != "determined" and 
@@ -21,7 +23,7 @@ def is_valid_market(m: dict, question) -> bool:
       , "pardon", "embassy", "Truth Social", "Secretary of Labor", "Presidency", "Pam Bondi", "Mamdani", "Kamala Harris", "Representative"]
     
     for word in keywords:
-        if word in question:
+        if word.lower() in question.lower():
             return True
     
     return False
@@ -66,7 +68,7 @@ def build_resolved_samples(markets_json : list[dict]):
             label=label
         ), m))
         
-        if samples > 3000:
+        if len(samples) > MAX_SAMPLES:
             break
 
     return samples
