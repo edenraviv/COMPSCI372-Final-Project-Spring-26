@@ -63,8 +63,6 @@ def build_resolved_samples(markets_json : list[dict]):
             last_price_dollars=float(m["last_price_dollars"]),
             volume_history=[float(m["volume_fp"] or 0)],
 
-            open_interest=float(m["open_interest_fp"] or 0),
-
             price_momentum=None,
             volume_weighted_price=None,
             time_to_resolution=0.0,
@@ -102,7 +100,7 @@ def print_markets(markets):
         print(f"STATUS: {status} | TYPE: {market_type}")
         print(f"YES PRICE: {yes:.3f} | NO PRICE: {no:.3f}")
         print(f"LAST PRICE DOLLARS: {m.get("last_price_dollars")}")
-        print(f"VOLUME: {volume} | OPEN INTEREST: {open_interest}")
+        print(f"VOLUME: {volume}")
         print(f"CLOSE TIME: {close_time}")
         print(f"RESULT: {result}")
 
