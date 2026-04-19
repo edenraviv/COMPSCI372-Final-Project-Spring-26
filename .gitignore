@@ -37,9 +37,7 @@ wheels/
 # ========================
 # Data (raw & processed)
 # ========================
-data/raw_market_data.json
-data/processed_market_data.json
-data/vector_store/
+data/
 
 # Allow directory structure but not contents
 !data/raw/.gitkeep
