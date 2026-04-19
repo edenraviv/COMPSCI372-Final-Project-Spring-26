@@ -1,5 +1,7 @@
 from schema import MarketFeatures
 from datetime import datetime, timezone
+import json
+import os
 
 def is_clean_binary_market(m: dict) -> bool:
     if (m.get("status") != "closed" and
@@ -115,3 +117,7 @@ def extract_market_question(m: dict) -> str:
         return associated
 
     return title
+
+def write_to_file(data, file):
+    with open(file, "w") as f:
+        json.dump(data, f, indent=2)
