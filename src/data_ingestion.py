@@ -89,7 +89,6 @@ def print_markets(markets):
         no = float(m.get("no_ask_dollars", 0))
 
         volume = float(m.get("volume_fp", 0))
-        open_interest = float(m.get("open_interest_fp", 0))
 
         result = m.get("result", "unresolved")
         close_time = m.get("close_time", "N/A")
