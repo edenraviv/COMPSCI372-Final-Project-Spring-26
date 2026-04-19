@@ -23,11 +23,14 @@ def is_valid_market(m: dict, question) -> bool:
     if m.get("result") not in ["yes", "no"]:
         return False
     
-    keywords = ["election", "US Elections", "Primaries", "House","International elections","Senate","Governor",'Trump', 'Congress',
-      'International', 'SCOTUS & courts', 'Recurring', 'Iran', 'Hormuz', 'Strait', 'government', 'Kash Patel',
-      "Attorney", "Cabinet", "Venezuela", "Hegseth", "Americans", "tariffs", "DHS", "citizenship", "voter", "legislation", 
-      "Justice", "Supreme Court", "Senators", "Fed chair", "federal crime", "approval rating", "defense funding", "boycott", "executive order", "Powell", "Commissioner", "Cory Mills"
-      , "pardon", "embassy", "Truth Social", "Secretary of Labor", "Presidency", "Pam Bondi", "Mamdani", "Kamala Harris", "Representative"]
+    keywords = ["election", "US Elections", "Primaries", "House","International elections","Senate","Governor",'Trump', 'Congress', 'Melania', 'presidential election', 
+                'primary election', 'Democratic nominee', 'Republican', "Swing state", "House majority", "Senate majority", "Mayor election", "referendum", "recall election",
+                "Government shutdown", "Debt ceiling", "Tax bill", "Helathcare reform","recount", "foreign election", "National security", "ceasefire", "sanction", "nato",
+                "NOMINEE", "Prime Minister"
+                'SCOTUS & courts', 'Recurring', 'Iran', 'Hormuz', 'Strait', 'government', 'Kash Patel',
+                "Attorney", "Cabinet", "Venezuela", "Hegseth", "Americans", "tariffs", "DHS", "citizenship", "voter", "legislation", "immigration", "immigrants",
+                "Justice", "Supreme Court", "Senators", "Fed chair", "federal crime", "approval rating", "defense funding", "boycott", "executive order", "Powell", "Commissioner", "Cory Mills",
+                "pardon", "embassy", "Truth Social", "Secretary of Labor", "Presidency", "Pam Bondi", "Mamdani", "Kamala Harris", "House of Representatives", "Legislature"]
     
     def contains_keyword(question, keywords):
         q = question.lower()

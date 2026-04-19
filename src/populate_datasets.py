@@ -3,7 +3,7 @@ from data_ingestion import build_resolved_samples, extract_market_question, writ
 
 client = KalshiClient()
 
-markets = client.get_all_training_data(600000)
+markets = client.get_all_training_data(100000)
 
 '''
 # 2. Inspect raw fields you care about
