@@ -94,6 +94,8 @@ class KalshiClient:
             all_items.extend(batch)
             print(f"Fetched {len(batch)} | Total so far: {len(all_items)}")
             cursor = response.get("cursor")
+            if len(all_items) > 10000:
+                break
             if not cursor:
                 break
 
@@ -118,4 +120,4 @@ class KalshiClient:
         return list(all_markets.values())
         
     def get_event(self, event_ticker):
-        return self.get(f"/events/{event_ticker}").json()
+        return self.get(f"/events/{event_ticker}")

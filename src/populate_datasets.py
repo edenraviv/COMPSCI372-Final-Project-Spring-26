@@ -3,10 +3,9 @@ from data_ingestion import build_resolved_samples, extract_market_question, writ
 
 client = KalshiClient()
 
-response = client.get_markets("closed", limit=5)
-write_to_file(response["markets"], "data/raw_market_data.json")
+markets = client.get_all_training_data()
 
-markets = response["markets"]
+'''
 # 2. Inspect raw fields you care about
 for m in markets:
     print(m)
@@ -15,10 +14,11 @@ for m in markets:
     print(m["result"])
     print(m["market_type"])
     print(extract_market_question(m))
-    print("---")
+    print("---")'''
 
 # 3. Try building samples from that same batch
-samples = build_resolved_samples(response)
+samples = build_resolved_samples(markets)
 print(f"\nSamples built: {len(samples)}")
 
-write_to_file([s.__dict__ for s in samples], "data/processed_market_data.json")
+write_to_file([s.__dict__ for (s, _) in samples], "data/processed_market_data.json")
+write_to_file([m for (_, m) in samples],  "data/raw_market_data.json")

@@ -1,10 +1,11 @@
 from schema import MarketFeatures
 import json
 
-def is_clean_binary_market(m: dict) -> bool:
+def is_valid_market(m: dict, question) -> bool:
     if (m.get("status") != "closed" and
         m.get("status") != "determined" and 
-        m.get("status") != "settled"):
+        m.get("status") != "settled" and 
+        m.get("status") != "finalized"):
         return False
 
     if m.get("market_type") != "binary":
@@ -12,14 +13,23 @@ def is_clean_binary_market(m: dict) -> bool:
 
     if m.get("result") not in ["yes", "no"]:
         return False
-
-    return True
+    
+    keywords = ["election", "US Elections", "Primaries", "House","International elections","Senate","Governor","2028","Peru","Hungary",'Trump', 'Congress',
+      'International', 'SCOTUS & courts', 'Recurring', 'Local', 'Iran', 'Hormuz', 'Strait', 'government', 'Kash Patel', 'Israel',
+      "Attorney", "Cabinet", "Venezuela", "Hegseth", "Americans", "tariffs", "DHS", "ICE", "citizenship", "voter", "legislation", 
+      "Justice", "Supreme Court", "Senators", "Fed chair", "federal crime", "approval rating", "defense funding", "boycott", "executive order", "law", "Powell", "Commissioner", "Cory Mills"
+      , "pardon", "embassy", "Truth Social", "Secretary of Labor", "Presidency", "Pam Bondi", "Mamdani", "Kamala Harris", "Representative"]
+    
+    for word in keywords:
+        if word in question:
+            return True
+    
+    return False
 
 
 def build_resolved_samples(markets_json : list[dict]):
     """
     Builds training samples ONLY from closed/determined/settled  markets.
-    IMPORTANT: assumes API returns final resolved state.
     """
 
     samples = []
@@ -27,7 +37,8 @@ def build_resolved_samples(markets_json : list[dict]):
     for m in markets_json:
 
         # ONLY TRAIN ON CLEAN BINARY MARKETS
-        if not is_clean_binary_market(m):
+        question = extract_market_question(m)
+        if not is_valid_market(m, question):
             continue
 
         # label: 1 if YES happened, 0 otherwise
@@ -36,7 +47,7 @@ def build_resolved_samples(markets_json : list[dict]):
         yes_price = float(m["yes_ask_dollars"])
         no_price = float(m["no_ask_dollars"])
 
-        samples.append(MarketFeatures(
+        samples.append((MarketFeatures(
             market_id=m["ticker"],
 
             yes_price=yes_price,
@@ -51,10 +62,10 @@ def build_resolved_samples(markets_json : list[dict]):
             volume_weighted_price=None,
             time_to_resolution=0.0,
 
-            rag_query=extract_market_question(m),
+            rag_query= question,
 
             label=label
-        ))
+        ), m))
 
     return samples
 
@@ -119,3 +130,7 @@ def extract_market_question(m: dict) -> str:
 def write_to_file(data, file):
     with open(file, "w") as f:
         json.dump(data, f, indent=2)
+        
+        
+    
+
