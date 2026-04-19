@@ -55,7 +55,7 @@ class KalshiClient:
         r.raise_for_status()
         return r.json()
 
-    def get_markets(self, status, limit, cursor, min_created_ts, max_created_ts) -> dict:
+    def get_markets(self, status, limit, cursor=None, min_created_ts=None, max_created_ts=None) -> dict:
         params = {"status": status, 
                   "limit": limit,
                   "min_created_ts": min_created_ts,
@@ -104,8 +104,7 @@ class KalshiClient:
         Fetches all resolved political markets from both endpoints and merges.
         """
         historical = self._paginate("/historical/markets", {
-        "category": "Politics",
-            "limit": 1000,
+            "limit": 1000
         })
 
         recent = self._paginate("/markets", {
