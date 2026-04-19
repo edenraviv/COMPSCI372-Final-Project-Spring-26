@@ -16,7 +16,7 @@ def is_clean_binary_market(m: dict) -> bool:
     return True
 
 
-def build_resolved_samples(markets_json):
+def build_resolved_samples(markets_json : list[dict]):
     """
     Builds training samples ONLY from closed/determined/settled  markets.
     IMPORTANT: assumes API returns final resolved state.
@@ -24,7 +24,7 @@ def build_resolved_samples(markets_json):
 
     samples = []
 
-    for m in markets_json["markets"]:
+    for m in markets_json:
 
         # ONLY TRAIN ON CLEAN BINARY MARKETS
         if not is_clean_binary_market(m):

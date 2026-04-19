@@ -108,8 +108,6 @@ class KalshiClient:
         })
 
         recent = self._paginate("/markets", {
-            "category": "Politics",
-            "status": "finalized",
             "limit": 1000,
         })
 
