@@ -17,9 +17,8 @@ class MarketFeatures:
     market_id: str
     yes_price: float                            # 0-100 cents (normalize before use)
     no_price: float
-    price_history: list[float]                  # Ordered ascending by time
+    last_price_dollars: float              
     volume_history: list[float]
-    open_interest: float
     price_momentum: Optional[float] = None      # e.g. 7-day delta
     volume_weighted_price: Optional[float] = None
     time_to_resolution: Optional[float] = None  # Days until resolution
@@ -76,7 +75,7 @@ def _extract_numeric_features(features: MarketFeatures) -> torch.Tensor:
     raw = [
         features.yes_price,
         features.no_price,
-        features.open_interest,
+        features.last_price_dollars,
         features.price_momentum or 0.0,
         features.volume_weighted_price or 0.0,
         features.time_to_resolution or 0.0,
