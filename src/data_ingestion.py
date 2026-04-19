@@ -1,7 +1,5 @@
 from schema import MarketFeatures
-from datetime import datetime, timezone
 import json
-import os
 
 def is_clean_binary_market(m: dict) -> bool:
     if (m.get("status") != "closed" and
