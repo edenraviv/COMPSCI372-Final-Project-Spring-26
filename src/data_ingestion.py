@@ -1,5 +1,6 @@
 from schema import MarketFeatures
 import json
+import re
 
 MAX_SAMPLES = 3000
 
@@ -28,9 +29,16 @@ def is_valid_market(m: dict, question) -> bool:
       "Justice", "Supreme Court", "Senators", "Fed chair", "federal crime", "approval rating", "defense funding", "boycott", "executive order", "law", "Powell", "Commissioner", "Cory Mills"
       , "pardon", "embassy", "Truth Social", "Secretary of Labor", "Presidency", "Pam Bondi", "Mamdani", "Kamala Harris", "Representative"]
     
-    for word in keywords:
-        if word.lower() in question.lower():
-            return True
+    def contains_keyword(question, keywords):
+        q = question.lower()
+        for word in keywords:
+            pattern = rf"\b{re.escape(word.lower())}\b"
+            if re.search(pattern, q):
+                return True
+        return False
+
+    if contains_keyword(question, keywords):
+        return True
     
     return False
 
@@ -98,7 +106,6 @@ def print_markets(markets):
         print(f"TICKER: {ticker}")
         print(f"STATUS: {status} | TYPE: {market_type}")
         print(f"YES PRICE: {yes:.3f} | NO PRICE: {no:.3f}")
-        print(f"LAST PRICE DOLLARS: {m.get("last_price_dollars")}")
         print(f"VOLUME: {volume}")
         print(f"CLOSE TIME: {close_time}")
         print(f"RESULT: {result}")
