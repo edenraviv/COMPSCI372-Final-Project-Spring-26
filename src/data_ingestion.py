@@ -12,6 +12,12 @@ def is_valid_market(m: dict, question) -> bool:
 
     if m.get("market_type") != "binary":
         return False
+    
+    if m.get("mve_collection_ticker"):
+        return False
+    
+    if m.get("mve_selected_legs"):
+        return False
 
     if m.get("result") not in ["yes", "no"]:
         return False
