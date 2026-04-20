@@ -156,6 +156,6 @@ class KalshiClient:
 
         if not candles:
             historical_response = self.get(f"/historical/markets/{ticker}/candlesticks", params)
-            candles = historical_response.get("candles", [])
+            candles = historical_response.get("candlesticks", [])
 
         return candles

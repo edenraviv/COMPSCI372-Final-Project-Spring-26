@@ -69,7 +69,7 @@ def build_market_series(client, raw_market, label_map):
     start_ts = to_unix(start_str)
     end_ts = to_unix(end_str)
 
-    print(f"  [{ticker}] start={start_ts} end={end_ts} diff={end_ts - start_ts}s")
+    #print(f"  [{ticker}] start={start_ts} end={end_ts} diff={end_ts - start_ts}s")
 
     if end_ts <= start_ts:
         print(f"  [{ticker}] SKIP: end <= start")
@@ -87,7 +87,7 @@ def build_market_series(client, raw_market, label_map):
             end=end_ts,
             period=60,
         )
-        print(f"  [{ticker}] raw response: {str(response)[:200]}")
+        #print(f"  [{ticker}] raw response: {str(response)[:200]}")
     except requests.exceptions.HTTPError as e:
         if e.response.status_code in (404, 400):
             print(f"  [{ticker}] SKIP: {e.response.status_code}")
