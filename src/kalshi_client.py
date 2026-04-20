@@ -49,12 +49,26 @@ class KalshiClient:
             "KALSHI-ACCESS-TIMESTAMP": timestamp,
         }
 
-    def get(self, path, params=None):
+    def get(self, path, params=None, retries=5):
         url = self.base_url + path
-        headers = self._sign_request("GET", path)
-        r = requests.get(url, headers=headers, params=params)
-        r.raise_for_status()
-        return r.json()
+
+        for attempt in range(retries):
+            headers = self._sign_request("GET", path)
+            r = requests.get(url, headers=headers, params=params)
+
+            if r.status_code == 429:
+                wait = 2 ** attempt
+                print(f"Rate limited on {path}, waiting {wait}s (attempt {attempt+1}/{retries})")
+                time.sleep(wait)
+                continue
+
+            if not r.ok and r.status_code != 404:
+                print(f"API error {r.status_code} for {path}: {r.text}")
+
+            r.raise_for_status()
+            return r.json()
+
+        raise Exception(f"Max retries exceeded for {path}")
 
     def get_markets(self, status, limit, cursor=None, min_created_ts=None, max_created_ts=None) -> dict:
         params = {"status": status, 
@@ -122,3 +136,15 @@ class KalshiClient:
         
     def get_event(self, event_ticker):
         return self.get(f"/events/{event_ticker}")
+    
+    def get_candles(self, series_ticker, ticker, start: int, end: int, period=60):
+        """
+        Fetch candlestick price history for a market between open and close.
+        """
+        params = {
+            "start_ts": start,
+            "end_ts": end,
+            "period_interval": period
+        }
+
+        return self.get(f"/series/{series_ticker}/markets/{ticker}/candlesticks", params)
