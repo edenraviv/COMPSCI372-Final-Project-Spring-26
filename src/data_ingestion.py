@@ -171,6 +171,10 @@ def _parse_candle(raw: dict) -> CandleFeatures:
         open_interest=float(raw.get("open_interest", 0)),
     )
 
+def count_candlesticks_per_market(markets):
+    yes_count = sum(1 for m in markets if m.get("result") == "yes")
+    no_count = sum(1 for m in markets if m.get("result") == "no")
+    print(f"YES: {yes_count} | NO: {no_count} | ratio: {yes_count/len(markets):.2f}")
 
 def load_timeseries_samples(path: str) -> list[TimeseriesSample]:
     """
@@ -193,7 +197,6 @@ def load_timeseries_samples(path: str) -> list[TimeseriesSample]:
         ))
     return samples
 
-
 def write_to_file(data, file):
     with open(file, "w") as f:
         json.dump(data, f, indent=2)
@@ -205,6 +208,3 @@ def append_to_file(data, file):
 def read_from_json_file(file):
     with open(file, "r") as f:
         return json.load(f)
-
-    
-
