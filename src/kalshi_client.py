@@ -147,4 +147,15 @@ class KalshiClient:
             "period_interval": period
         }
 
-        return self.get(f"/series/{series_ticker}/markets/{ticker}/candlesticks", params)
+        candles = []
+        try:
+            current_market_response = self.get(f"/series/{series_ticker}/markets/{ticker}/candlesticks", params)
+            candles = current_market_response.get("candles", [])
+        except Exception:
+            pass
+
+        if not candles:
+            historical_response = self.get(f"/historical/markets/{ticker}/candlesticks", params)
+            candles = historical_response.get("candles", [])
+
+        return candles
