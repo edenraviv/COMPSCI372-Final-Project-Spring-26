@@ -4,23 +4,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 from kalshi_client import KalshiClient
-from data_ingestion import write_to_file
-
-
-# -----------------------------
-# 1. Load processed dataset (labels only)
-# -----------------------------
-def load_processed(path="data/processed_market_data.json"):
-    with open(path, "r") as f:
-        return json.load(f)
-
-
-# -----------------------------
-# 2. Load raw dataset (timing info)
-# -----------------------------
-def load_raw(path="data/raw_market_data.json"):
-    with open(path, "r") as f:
-        return json.load(f)
+from data_ingestion import write_to_file, read_from_json_file
 
 
 # -----------------------------
@@ -150,8 +134,8 @@ def save(out, path="data/market_timeseries.json"):
 if __name__ == "__main__":
     client = KalshiClient()
 
-    raw_markets = load_raw()
-    processed_markets = load_processed()
+    raw_markets = read_from_json_file("data/raw_market_data.json")
+    processed_markets = read_from_json_file("data/processed_market_data.json")
 
     print(f"Raw markets: {len(raw_markets)}")
     print(f"Processed markets: {len(processed_markets)}")

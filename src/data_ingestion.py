@@ -202,6 +202,9 @@ def append_to_file(data, file):
     with open(file, "a") as f:
         json.dump(data, f, indent=2)
 
+def read_from_json_file(file):
+    with open(file, "r") as f:
+        return json.load(f)
 
     
 
