@@ -4,6 +4,7 @@ import requests
 import pandas as pd
 from datetime import datetime
 from kalshi_client import KalshiClient
+from data_ingestion import write_to_file
 
 
 # -----------------------------
@@ -140,10 +141,8 @@ def save(out, path="data/market_timeseries.json"):
         k: v.assign(ds=v["ds"].astype(str)).to_dict(orient="records")
         for k, v in out.items()
     }
-    with open(path, "w") as f:
-        json.dump(serializable, f)
+    write_to_file(serializable, path)
     print(f"Saved {len(serializable)} time series to {path}")
-
 
 # -----------------------------
 # 8. Run
