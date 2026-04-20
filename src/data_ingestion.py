@@ -1,4 +1,4 @@
-from schema import MarketFeatures
+from schema import MarketFeatures, CandleFeatures, TimeseriesSample
 import json
 import re
 
@@ -144,6 +144,55 @@ def extract_market_question(m: dict) -> str:
         return associated
 
     return title
+
+def _parse_candle(raw: dict) -> CandleFeatures:
+    p = raw.get("price", {})
+    ask = raw.get("yes_ask", {})
+    bid = raw.get("yes_bid", {})
+    prev = p.get("previous")
+    return CandleFeatures(
+        end_period_ts=raw["end_period_ts"],
+        ds=raw["ds"],
+        price_close=float(p.get("close", 0)),
+        price_high=float(p.get("high", 0)),
+        price_low=float(p.get("low", 0)),
+        price_open=float(p.get("open", 0)),
+        price_mean=float(p.get("mean", 0)),
+        price_previous=float(prev) if prev is not None else None,
+        yes_ask_close=float(ask.get("close", 0)),
+        yes_ask_high=float(ask.get("high", 0)),
+        yes_ask_low=float(ask.get("low", 0)),
+        yes_ask_open=float(ask.get("open", 0)),
+        yes_bid_close=float(bid.get("close", 0)),
+        yes_bid_high=float(bid.get("high", 0)),
+        yes_bid_low=float(bid.get("low", 0)),
+        yes_bid_open=float(bid.get("open", 0)),
+        volume=float(raw.get("volume", 0)),
+        open_interest=float(raw.get("open_interest", 0)),
+    )
+
+
+def load_timeseries_samples(path: str) -> list[TimeseriesSample]:
+    """
+    Loads market_timeseries.json and returns one TimeseriesSample per market.
+    Each sample contains the full ordered sequence of hourly candles and the resolved label.
+    """
+    with open(path) as f:
+        data = json.load(f)
+
+    samples = []
+    for market_id, candles in data.items():
+        if not candles:
+            continue
+        parsed = [_parse_candle(c) for c in candles]
+        samples.append(TimeseriesSample(
+            market_id=market_id,
+            series_id=candles[0].get("series_id", ""),
+            candles=parsed,
+            label=float(candles[-1]["label"]),
+        ))
+    return samples
+
 
 def write_to_file(data, file):
     with open(file, "w") as f:
