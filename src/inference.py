@@ -21,6 +21,14 @@ def get_and_format_candles(ticker: str, series_ticker: str = None,
     if start is None:
         start = end - 7 * 24 * 3600
 
+    # Kalshi market tickers are <SERIES>-<EVENT>[-<SUBJECT>]; the live
+    # /series/{series}/markets/{ticker}/candlesticks endpoint needs the
+    # series. Derive it from the first segment when the caller didn't
+    # pass one, so live markets don't fall through to the historical
+    # endpoint (which only serves settled markets).
+    if series_ticker is None:
+        series_ticker = ticker.split("-", 1)[0]
+
     raw_candles = client.get_candles(
         series_ticker=series_ticker, ticker=ticker,
         start=start, end=end, period=period,
