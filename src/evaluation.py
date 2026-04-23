@@ -1,4 +1,5 @@
 
+import time
 import matplotlib.pyplot as plt
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 import pandas as pd
@@ -7,7 +8,134 @@ from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
 from schema import FEATURE_GROUPS
 from data_visualization import PLOTS_DIR
+from models import ensemble_predict
 import shap
+
+
+def evaluate_baselines(df_train, df_val):
+    '''BASELINE MODELS
+
+    Two naive baselines set the floor the ML model must beat:
+      Constant prior   — always predict the training-set YES rate
+      Market price     — use the current candle's close price as the probability
+                         (this is the strongest naive baseline for prediction
+                          markets, since price already encodes crowd belief)'''
+    y_val    = df_val["label"].values
+    pos_rate = df_train["label"].mean()
+
+    const_preds = np.full(len(y_val), pos_rate)
+    prior_preds = df_val["close"].clip(0.01, 0.99).values
+
+    results = {}
+    for name, preds in [("Constant prior", const_preds),
+                         ("Market price",   prior_preds)]:
+        results[name] = {
+            "log_loss": log_loss(y_val, preds),
+            "auc":      roc_auc_score(y_val, preds),
+            "brier":    brier_score_loss(y_val, preds),
+        }
+
+    print("\n── Baselines ───────────────────────────────────")
+    for name, m in results.items():
+        print(f"  {name:<20} logloss={m['log_loss']:.4f}  "
+              f"auc={m['auc']:.4f}  brier={m['brier']:.4f}")
+    return results
+
+
+def full_evaluate(lgbm_model, xgb_model, df_test,
+                  X_test, y_test, baseline_results):
+    '''FULL EVALUATION — 3 metrics + inference time.'''
+    def _metrics(probs):
+        return {
+            "log_loss": log_loss(y_test, probs),
+            "auc":      roc_auc_score(y_test, probs),
+            "brier":    brier_score_loss(y_test, probs),
+        }
+
+    # Inference time measurement
+    t0 = time.perf_counter()
+    lgbm_probs = lgbm_model.predict(X_test)
+    lgbm_ms    = (time.perf_counter() - t0) * 1000
+
+    t0 = time.perf_counter()
+    ens_probs  = ensemble_predict(lgbm_model, xgb_model, X_test)
+    ens_ms     = (time.perf_counter() - t0) * 1000
+
+    lgbm_m = _metrics(lgbm_probs)
+    ens_m  = _metrics(ens_probs)
+
+    print("\n══ Final Test Set Evaluation ═══════════════════")
+    print(f"  {'Model':<28} {'LogLoss':>8} {'AUC':>7} "
+          f"{'Brier':>7} {'ms':>7}")
+    print("  " + "─" * 56)
+    for name, bm in baseline_results.items():
+        print(f"  {name:<28} {bm['log_loss']:>8.4f} "
+              f"{bm['auc']:>7.4f} {bm['brier']:>7.4f}    N/A")
+    print(f"  {'LightGBM':<28} {lgbm_m['log_loss']:>8.4f} "
+          f"{lgbm_m['auc']:>7.4f} {lgbm_m['brier']:>7.4f} "
+          f"{lgbm_ms:>6.1f}")
+    print(f"  {'Ensemble (LGBM+XGB)':<28} {ens_m['log_loss']:>8.4f} "
+          f"{ens_m['auc']:>7.4f} {ens_m['brier']:>7.4f} "
+          f"{ens_ms:>6.1f}")
+
+    market_auc = baseline_results.get("Market price", {}).get("auc", 0)
+    if ens_m["auc"] > market_auc:
+        print(f"\n  Ensemble beats market-price baseline by "
+              f"{ens_m['auc'] - market_auc:.4f} AUC — real edge exists.")
+    else:
+        print(f"\n  Ensemble does NOT beat market-price baseline.")
+
+    _error_analysis(df_test, ens_probs, y_test)
+    return ens_probs, ens_m
+
+
+def backtest(df_test: pd.DataFrame, probs: np.ndarray,
+             threshold: float = 0.55, stake: float = 1.0):
+    '''BACKTESTING / SIMULATION
+
+    Simulates a simple YES/NO betting strategy on held-out test markets.
+    A bet is placed when the model's predicted probability exceeds `threshold`
+    (YES bet) or falls below `1 - threshold` (NO bet).
+    PnL is computed as: payout - cost, where cost = close price * stake.
+    Cumulative PnL plotted to assess real-world viability.'''
+    df = df_test.copy().reset_index(drop=True)
+    df["prob"]  = probs
+    df["label"] = df["label"].values
+    df["pnl"]   = 0.0
+
+    for i, row in df.iterrows():
+        p, c, lab = row["prob"], row["close"], row["label"]
+        if p > threshold:
+            df.at[i, "pnl"] = (stake if lab == 1 else 0.0) - c * stake
+        elif p < (1 - threshold):
+            df.at[i, "pnl"] = (stake if lab == 0 else 0.0) - (1-c) * stake
+
+    total_bets = (df["pnl"] != 0).sum()
+    total_pnl  = df["pnl"].sum()
+    hit_rate   = ((df.loc[df["pnl"] != 0, "pnl"] > 0).mean()
+                  if total_bets else 0)
+
+    print(f"\n── Backtesting (threshold={threshold}) ──────────")
+    print(f"  Total bets  : {total_bets}")
+    print(f"  Total PnL   : ${total_pnl:.2f}")
+    print(f"  Hit rate    : {hit_rate:.2%}")
+    print(f"  Avg PnL/bet : ${total_pnl / max(total_bets, 1):.4f}")
+
+    df["cum_pnl"] = df["pnl"].cumsum()
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.plot(df["cum_pnl"].values, color="#4C9BE8", linewidth=1.5)
+    ax.axhline(0, color="gray", linestyle="--", linewidth=1)
+    ax.set_title(f"Cumulative PnL — Backtest (threshold={threshold})")
+    ax.set_xlabel("Observation #")
+    ax.set_ylabel("Cumulative PnL ($)")
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+    path = PLOTS_DIR / "backtest_pnl.png"
+    plt.savefig(path, dpi=120)
+    plt.close()
+    print(f"  Backtest PnL chart saved → {path}")
+    return df
+
 
 def _error_analysis(df_test: pd.DataFrame,
                     probs: np.ndarray, y_true: np.ndarray):
