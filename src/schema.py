@@ -26,94 +26,11 @@ class MarketFeatures:
     label: Optional[float] = None              # Ground truth: 1.0 = YES resolved, 0.0 = NO
 
 
-@dataclass
-class PredictionResult:
-    """Output contract."""
-    market_id: str
-    estimated_probability: float
-    market_implied_probability: float
-    edge: float                                 # model estimate - market price
-    rag_context_used: str
-    confidence: Optional[float] = None
-
-
 # ---------------------------------------------------------------------------
 # Timeseries Schema
 # ---------------------------------------------------------------------------
 
 N_CANDLE_FEATURES = 16  # number of numeric features per candle (see _candle_to_row)
-
-@dataclass
-class CandleFeatures:
-    """One hourly candlestick row from market_timeseries.json."""
-    end_period_ts: int
-    ds: str
-    price_close: float
-    price_high: float
-    price_low: float
-    price_open: float
-    price_mean: float
-    price_previous: Optional[float]
-    yes_ask_close: float
-    yes_ask_high: float
-    yes_ask_low: float
-    yes_ask_open: float
-    yes_bid_close: float
-    yes_bid_high: float
-    yes_bid_low: float
-    yes_bid_open: float
-    volume: float
-    open_interest: float
-
-
-@dataclass
-class TimeseriesSample:
-    """Full price history for one market, plus its resolved label."""
-    market_id: str
-    series_id: str
-    candles: list[CandleFeatures]
-    label: float                    # 1.0 = YES resolved, 0.0 = NO
-
-
-def _candle_to_row(c: CandleFeatures) -> list[float]:
-    return [
-        c.price_close, c.price_high, c.price_low, c.price_open, c.price_mean,
-        c.price_previous or 0.0,
-        c.yes_ask_close, c.yes_ask_high, c.yes_ask_low, c.yes_ask_open,
-        c.yes_bid_close, c.yes_bid_high, c.yes_bid_low, c.yes_bid_open,
-        c.volume, c.open_interest,
-    ]
-
-
-class TimeseriesDataset(Dataset):
-    """
-    Wraps a list of TimeseriesSample into a PyTorch Dataset.
-    Each item is a (seq_len, N_CANDLE_FEATURES) tensor, padded/truncated to max_seq_len.
-    Sequences are right-aligned: padding goes at the front, most-recent candles last.
-    """
-
-    def __init__(self, samples: list[TimeseriesSample], max_seq_len: int = 168):
-        assert all(s.label is not None for s in samples), \
-            "All training samples must have a label."
-        self.samples = samples
-        self.max_seq_len = max_seq_len
-
-    def __len__(self) -> int:
-        return len(self.samples)
-
-    def __getitem__(self, idx: int):
-        sample = self.samples[idx]
-        rows = [_candle_to_row(c) for c in sample.candles]
-
-        # truncate to the most-recent max_seq_len candles, then left-pad with zeros
-        rows = rows[-self.max_seq_len:]
-        pad_len = self.max_seq_len - len(rows)
-        if pad_len > 0:
-            rows = [[0.0] * N_CANDLE_FEATURES] * pad_len + rows
-
-        features = torch.tensor(rows, dtype=torch.float32)          # (max_seq_len, N_CANDLE_FEATURES)
-        label = torch.tensor([sample.label], dtype=torch.float32)   # (1,)
-        return features, label, sample.market_id
 
 
 FEATURE_GROUPS = {
