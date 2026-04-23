@@ -48,18 +48,18 @@ import shap
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from pathlib import Path
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 from data_ingestion import load_raw
 from pre_processing import preprocess
 from kalshi_client import KalshiClient
+from evaluation import ablation_study, _error_analysis
+from data_visualization import _plot_feature_importance, _plot_training_curves
+from schema import ALL_FEATURE_COLS
+from data_visualization import PLOTS_DIR
 
 warnings.filterwarnings("ignore")
-
-PLOTS_DIR = Path("plots")
-PLOTS_DIR.mkdir(exist_ok=True)
 
 MODEL_LGBM_PATH = "kalshi_lgbm.txt"
 MODEL_XGB_PATH  = "kalshi_xgb.json"
@@ -137,40 +137,6 @@ def drop_resolution_candle(df: pd.DataFrame) -> pd.DataFrame:
 #   total_hours  — requires knowing full market duration in advance
 #   pct_elapsed  — same reason; divides hour_index by total_hours
 # ══════════════════════════════════════════════════════════════════════════════
-
-FEATURE_GROUPS = {
-    "microstructure": [
-        "bid_ask_spread", "midpoint", "close_vs_mid",
-        "price_range", "ask_range", "bid_range", "close_vs_mean",
-    ],
-    "momentum": [
-        "momentum_1h", "momentum_2h",
-        "ask_momentum", "bid_momentum", "spread_change",
-    ],
-    "volume": [
-        "volume_delta", "oi_delta", "vol_to_oi", "log_volume", "log_oi",
-    ],
-    "time": [
-        "hours_to_expiry", "is_final_3h", "is_final_1h", "hour_index",
-    ],
-    "rolling": [
-        "close_roll_mean_2h", "close_roll_mean_3h",
-        "close_roll_std_2h",  "close_roll_std_3h",
-        "vol_roll_sum_2h",    "vol_roll_sum_3h",
-    ],
-    "level": [
-        "close_is_floor", "close_is_ceiling",
-        "close_vs_open", "first_close", "running_std",
-    ],
-    "raw": [
-        "close", "ask_close", "bid_close", "open_interest", "volume",
-    ],
-    "missing_flags": [
-        "price_mean_missing", "bid_close_missing", "ask_close_missing",
-    ],
-}
-
-ALL_FEATURE_COLS = [f for cols in FEATURE_GROUPS.values() for f in cols]
 
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -409,33 +375,6 @@ def hyperparam_search(X_train, y_train, X_val, y_val, feature_cols):
     return best_model, results, best_name
 
 
-def _plot_training_curves(all_evals: dict):
-    """Training loss + AUC over boosting rounds for all 3 configs."""
-    n   = len(all_evals)
-    fig, axes = plt.subplots(1, n, figsize=(5 * n, 4), sharey=True)
-    if n == 1:
-        axes = [axes]
-
-    for ax, (name, evals) in zip(axes, all_evals.items()):
-        tr_loss  = evals.get("train", {}).get("binary_logloss", [])
-        val_loss = evals.get("val",   {}).get("binary_logloss", [])
-        ax.plot(tr_loss,  label="Train", linewidth=1.5)
-        ax.plot(val_loss, label="Val",   linewidth=1.5, linestyle="--")
-        ax.set_title(name, fontsize=9)
-        ax.set_xlabel("Boosting round")
-        ax.set_ylabel("Log-loss")
-        ax.legend(fontsize=8)
-        ax.grid(alpha=0.3)
-
-    fig.suptitle("Training Curves — Log-loss over Boosting Rounds",
-                 fontsize=11)
-    plt.tight_layout()
-    path = PLOTS_DIR / "training_curves.png"
-    plt.savefig(path, dpi=120)
-    plt.close()
-    print(f"\n  Training curves saved → {path}")
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # 10. FEATURE SELECTION — importance-based pruning with documented impact
 #
@@ -468,20 +407,6 @@ def select_features(model, feature_cols: list,
 
     _plot_feature_importance(imp)
     return selected, imp
-
-
-def _plot_feature_importance(imp: pd.Series, top_n: int = 20):
-    imp_top = imp.sort_values(ascending=True).tail(top_n)
-    fig, ax = plt.subplots(figsize=(7, max(4, top_n * 0.32)))
-    ax.barh(imp_top.index, imp_top.values, color="#4C9BE8")
-    ax.set_xlabel("Gain importance")
-    ax.set_title(f"Top {top_n} Features by Gain")
-    ax.grid(axis="x", alpha=0.3)
-    plt.tight_layout()
-    path = PLOTS_DIR / "feature_importance.png"
-    plt.savefig(path, dpi=120)
-    plt.close()
-    print(f"  Feature importance chart saved → {path}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -565,109 +490,6 @@ def ensemble_predict(lgbm_model, xgb_model, X, lgbm_weight=0.6):
     lgbm_probs = lgbm_model.predict(X)
     xgb_probs  = xgb_model.predict(xgb.DMatrix(X))
     return lgbm_weight * lgbm_probs + (1 - lgbm_weight) * xgb_probs
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 14. FULL EVALUATION — 3 metrics + inference time
-# ══════════════════════════════════════════════════════════════════════════════
-
-def full_evaluate(lgbm_model, xgb_model, df_test,
-                  X_test, y_test, baseline_results):
-    def _metrics(probs):
-        return {
-            "log_loss": log_loss(y_test, probs),
-            "auc":      roc_auc_score(y_test, probs),
-            "brier":    brier_score_loss(y_test, probs),
-        }
-
-    # Inference time measurement
-    t0 = time.perf_counter()
-    lgbm_probs = lgbm_model.predict(X_test)
-    lgbm_ms    = (time.perf_counter() - t0) * 1000
-
-    t0 = time.perf_counter()
-    ens_probs  = ensemble_predict(lgbm_model, xgb_model, X_test)
-    ens_ms     = (time.perf_counter() - t0) * 1000
-
-    lgbm_m = _metrics(lgbm_probs)
-    ens_m  = _metrics(ens_probs)
-
-    print("\n══ Final Test Set Evaluation ═══════════════════")
-    print(f"  {'Model':<28} {'LogLoss':>8} {'AUC':>7} "
-          f"{'Brier':>7} {'ms':>7}")
-    print("  " + "─" * 56)
-    for name, bm in baseline_results.items():
-        print(f"  {name:<28} {bm['log_loss']:>8.4f} "
-              f"{bm['auc']:>7.4f} {bm['brier']:>7.4f}    N/A")
-    print(f"  {'LightGBM':<28} {lgbm_m['log_loss']:>8.4f} "
-          f"{lgbm_m['auc']:>7.4f} {lgbm_m['brier']:>7.4f} "
-          f"{lgbm_ms:>6.1f}")
-    print(f"  {'Ensemble (LGBM+XGB)':<28} {ens_m['log_loss']:>8.4f} "
-          f"{ens_m['auc']:>7.4f} {ens_m['brier']:>7.4f} "
-          f"{ens_ms:>6.1f}")
-
-    market_auc = baseline_results.get("Market price", {}).get("auc", 0)
-    if ens_m["auc"] > market_auc:
-        print(f"\n  Ensemble beats market-price baseline by "
-              f"{ens_m['auc'] - market_auc:.4f} AUC — real edge exists.")
-    else:
-        print(f"\n  Ensemble does NOT beat market-price baseline.")
-
-    _error_analysis(df_test, ens_probs, y_test)
-    return ens_probs, ens_m
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 15. ERROR ANALYSIS — failure case breakdown with visualization
-#
-# Discussion:
-#   False Positives cluster near 0.5 — model is uncertain, slight YES bias
-#   in thin markets where bid/ask spread is wide.
-#   False Negatives occur when volume was near zero early (no momentum signal)
-#   and price collapsed in the final hour without warning candles.
-#   Largest absolute errors occur in the 1-3h bucket where the market is
-#   transitioning from uncertain to resolved but momentum reversals are common.
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _error_analysis(df_test: pd.DataFrame,
-                    probs: np.ndarray, y_true: np.ndarray):
-    df = df_test.copy().reset_index(drop=True)
-    df["prob"]  = probs
-    df["label"] = y_true
-    df["error"] = np.abs(probs - y_true)
-    df["pred"]  = (probs >= 0.5).astype(int)
-    df["fp"]    = ((df["pred"] == 1) & (df["label"] == 0)).astype(int)
-    df["fn"]    = ((df["pred"] == 0) & (df["label"] == 1)).astype(int)
-
-    print("\n── Error Analysis ──────────────────────────────")
-    print(f"  False positives : {df['fp'].sum()}")
-    print(f"  False negatives : {df['fn'].sum()}")
-    print(f"  Mean abs error  : {df['error'].mean():.4f}")
-
-    if "hours_to_expiry" in df.columns:
-        bins   = [0, 1, 3, 6, 12, np.inf]
-        labels = ["<1h", "1-3h", "3-6h", "6-12h", ">12h"]
-        df["tte_bin"] = pd.cut(df["hours_to_expiry"],
-                               bins=bins, labels=labels)
-        by_tte = df.groupby("tte_bin")["error"].mean()
-        print("\n  Mean abs error by hours-to-expiry bucket:")
-        print(by_tte.to_string())
-
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-    axes[0].hist(df.loc[df["fp"] == 1, "prob"], bins=20,
-                 color="#E84C4C", alpha=0.8)
-    axes[0].set_title("False Positives — Predicted Probability")
-    axes[0].set_xlabel("Predicted probability")
-    axes[1].hist(df.loc[df["fn"] == 1, "prob"], bins=20,
-                 color="#4C9BE8", alpha=0.8)
-    axes[1].set_title("False Negatives — Predicted Probability")
-    axes[1].set_xlabel("Predicted probability")
-    plt.tight_layout()
-    path = PLOTS_DIR / "error_analysis.png"
-    plt.savefig(path, dpi=120)
-    plt.close()
-    print(f"\n  Error analysis plot saved → {path}")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 16. SHAP INTERPRETABILITY
@@ -755,107 +577,6 @@ def backtest(df_test: pd.DataFrame, probs: np.ndarray,
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 18. ABLATION STUDY
-#
-# Two independent design choices systematically varied:
-#
-#   A) Feature groups — remove one group at a time, measure val log-loss delta
-#      Positive delta = removing that group hurt performance (it was useful)
-#
-#   B) StandardScaler — compare with vs without normalization
-#      Documents whether scaling meaningfully affects gradient boosting
-#      (tree models are scale-invariant in theory, but scaling affects
-#       how missing sentinel values of -999 interact with real features)
-#
-# Results saved to plots/ablation_table.csv
-# ══════════════════════════════════════════════════════════════════════════════
-
-def ablation_study(df_train, df_val, feature_cols):
-    print("\n── Ablation Study ──────────────────────────────")
-    base_params = {
-        "objective": "binary", "metric": "binary_logloss",
-        "learning_rate": 0.05, "num_leaves": 31,
-        "min_data_in_leaf": 10, "lambda_l2": 1.0,
-        "feature_fraction": 0.8, "bagging_fraction": 0.8,
-        "bagging_freq": 5, "verbose": -1, "seed": 42,
-    }
-    y_train = df_train["label"].values
-    y_val   = df_val["label"].values
-
-    def _quick_train(X_tr, X_v):
-        dt = lgb.Dataset(X_tr, label=y_train)
-        dv = lgb.Dataset(X_v,  label=y_val, reference=dt)
-        m  = lgb.train(
-            base_params, dt, num_boost_round=200,
-            valid_sets=[dv], valid_names=["val"],
-            callbacks=[lgb.early_stopping(20, verbose=False),
-                       lgb.log_evaluation(9999)])
-        return log_loss(y_val, m.predict(X_v))
-
-    rows = []
-
-    # Baseline: all features + scaler
-    sc      = StandardScaler()
-    X_tr_all = sc.fit_transform(df_train[feature_cols].fillna(-999))
-    X_v_all  = sc.transform(df_val[feature_cols].fillna(-999))
-    base_ll  = _quick_train(X_tr_all, X_v_all)
-    rows.append({"Ablation": "Full model (all features + scaler)",
-                 "Val LogLoss": base_ll, "Delta vs baseline": 0.0})
-
-    # A) Remove each feature group
-    for grp, grp_cols in FEATURE_GROUPS.items():
-        kept = [c for c in feature_cols if c not in grp_cols]
-        if not kept:
-            continue
-        sc2  = StandardScaler()
-        X_tr = sc2.fit_transform(df_train[kept].fillna(-999))
-        X_v  = sc2.transform(df_val[kept].fillna(-999))
-        ll   = _quick_train(X_tr, X_v)
-        rows.append({"Ablation": f"Remove '{grp}'",
-                     "Val LogLoss": ll,
-                     "Delta vs baseline": ll - base_ll})
-
-    # B) No StandardScaler
-    X_tr_raw = df_train[feature_cols].fillna(-999).values
-    X_v_raw  = df_val[feature_cols].fillna(-999).values
-    ll_ns    = _quick_train(X_tr_raw, X_v_raw)
-    rows.append({"Ablation": "No StandardScaler",
-                 "Val LogLoss": ll_ns,
-                 "Delta vs baseline": ll_ns - base_ll})
-
-    tbl = pd.DataFrame(rows).sort_values("Delta vs baseline")
-    print(tbl.to_string(index=False, float_format="%.4f"))
-    print("\n  Positive delta = removing that choice hurt performance.")
-
-    path = PLOTS_DIR / "ablation_table.csv"
-    tbl.to_csv(path, index=False)
-    print(f"  Ablation table saved → {path}")
-    return tbl
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 19. SAVE / LOAD
-# ══════════════════════════════════════════════════════════════════════════════
-
-def save_models(lgbm_model, xgb_model, scaler, feature_cols):
-    lgbm_model.save_model(MODEL_LGBM_PATH)
-    xgb_model.save_model(MODEL_XGB_PATH)
-    with open(SCALER_PATH, "wb") as f:
-        pickle.dump({"scaler": scaler, "feature_cols": feature_cols}, f)
-    print(f"\nModels saved → {MODEL_LGBM_PATH}, "
-          f"{MODEL_XGB_PATH}, {SCALER_PATH}")
-
-
-def load_models():
-    lgbm_model = lgb.Booster(model_file=MODEL_LGBM_PATH)
-    xgb_model  = xgb.Booster()
-    xgb_model.load_model(MODEL_XGB_PATH)
-    with open(SCALER_PATH, "rb") as f:
-        d = pickle.load(f)
-    return lgbm_model, xgb_model, d["scaler"], d["feature_cols"]
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # 20. KALSHI API — fetch and format live candles
 #
 # Delegates the HTTP call to KalshiClient.get_candles (RSA-signed, with
@@ -910,6 +631,77 @@ def get_and_format_candles(ticker: str, series_ticker: str = None,
         })
 
     return {ticker: formatted}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 19. SAVE / LOAD
+# ══════════════════════════════════════════════════════════════════════════════
+
+def save_models(lgbm_model, xgb_model, scaler, feature_cols):
+    lgbm_model.save_model(MODEL_LGBM_PATH)
+    xgb_model.save_model(MODEL_XGB_PATH)
+    with open(SCALER_PATH, "wb") as f:
+        pickle.dump({"scaler": scaler, "feature_cols": feature_cols}, f)
+    print(f"\nModels saved → {MODEL_LGBM_PATH}, "
+          f"{MODEL_XGB_PATH}, {SCALER_PATH}")
+
+
+def load_models():
+    lgbm_model = lgb.Booster(model_file=MODEL_LGBM_PATH)
+    xgb_model  = xgb.Booster()
+    xgb_model.load_model(MODEL_XGB_PATH)
+    with open(SCALER_PATH, "rb") as f:
+        d = pickle.load(f)
+    return lgbm_model, xgb_model, d["scaler"], d["feature_cols"]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 14. FULL EVALUATION — 3 metrics + inference time
+# ══════════════════════════════════════════════════════════════════════════════
+
+def full_evaluate(lgbm_model, xgb_model, df_test,
+                  X_test, y_test, baseline_results):
+    def _metrics(probs):
+        return {
+            "log_loss": log_loss(y_test, probs),
+            "auc":      roc_auc_score(y_test, probs),
+            "brier":    brier_score_loss(y_test, probs),
+        }
+
+    # Inference time measurement
+    t0 = time.perf_counter()
+    lgbm_probs = lgbm_model.predict(X_test)
+    lgbm_ms    = (time.perf_counter() - t0) * 1000
+
+    t0 = time.perf_counter()
+    ens_probs  = ensemble_predict(lgbm_model, xgb_model, X_test)
+    ens_ms     = (time.perf_counter() - t0) * 1000
+
+    lgbm_m = _metrics(lgbm_probs)
+    ens_m  = _metrics(ens_probs)
+
+    print("\n══ Final Test Set Evaluation ═══════════════════")
+    print(f"  {'Model':<28} {'LogLoss':>8} {'AUC':>7} "
+          f"{'Brier':>7} {'ms':>7}")
+    print("  " + "─" * 56)
+    for name, bm in baseline_results.items():
+        print(f"  {name:<28} {bm['log_loss']:>8.4f} "
+              f"{bm['auc']:>7.4f} {bm['brier']:>7.4f}    N/A")
+    print(f"  {'LightGBM':<28} {lgbm_m['log_loss']:>8.4f} "
+          f"{lgbm_m['auc']:>7.4f} {lgbm_m['brier']:>7.4f} "
+          f"{lgbm_ms:>6.1f}")
+    print(f"  {'Ensemble (LGBM+XGB)':<28} {ens_m['log_loss']:>8.4f} "
+          f"{ens_m['auc']:>7.4f} {ens_m['brier']:>7.4f} "
+          f"{ens_ms:>6.1f}")
+
+    market_auc = baseline_results.get("Market price", {}).get("auc", 0)
+    if ens_m["auc"] > market_auc:
+        print(f"\n  Ensemble beats market-price baseline by "
+              f"{ens_m['auc'] - market_auc:.4f} AUC — real edge exists.")
+    else:
+        print(f"\n  Ensemble does NOT beat market-price baseline.")
+
+    _error_analysis(df_test, ens_probs, y_test)
+    return ens_probs, ens_m
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -160,3 +160,38 @@ class TimeseriesDataset(Dataset):
         features = torch.tensor(rows, dtype=torch.float32)          # (max_seq_len, N_CANDLE_FEATURES)
         label = torch.tensor([sample.label], dtype=torch.float32)   # (1,)
         return features, label, sample.market_id
+
+
+FEATURE_GROUPS = {
+    "microstructure": [
+        "bid_ask_spread", "midpoint", "close_vs_mid",
+        "price_range", "ask_range", "bid_range", "close_vs_mean",
+    ],
+    "momentum": [
+        "momentum_1h", "momentum_2h",
+        "ask_momentum", "bid_momentum", "spread_change",
+    ],
+    "volume": [
+        "volume_delta", "oi_delta", "vol_to_oi", "log_volume", "log_oi",
+    ],
+    "time": [
+        "hours_to_expiry", "is_final_3h", "is_final_1h", "hour_index",
+    ],
+    "rolling": [
+        "close_roll_mean_2h", "close_roll_mean_3h",
+        "close_roll_std_2h",  "close_roll_std_3h",
+        "vol_roll_sum_2h",    "vol_roll_sum_3h",
+    ],
+    "level": [
+        "close_is_floor", "close_is_ceiling",
+        "close_vs_open", "first_close", "running_std",
+    ],
+    "raw": [
+        "close", "ask_close", "bid_close", "open_interest", "volume",
+    ],
+    "missing_flags": [
+        "price_mean_missing", "bid_close_missing", "ask_close_missing",
+    ],
+}
+
+ALL_FEATURE_COLS = [f for cols in FEATURE_GROUPS.values() for f in cols]
