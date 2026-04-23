@@ -40,11 +40,12 @@ Install:
 import warnings
 import matplotlib
 matplotlib.use("Agg")
+import pandas as pd
 from data_ingestion import load_raw
 from candle_pre_processing import (preprocess, flatten,
                                    drop_resolution_candle, three_way_split)
 from features import engineer_features, scale_features, select_features
-from models import (HYPERPARAM_CONFIGS, hyperparam_search,
+from models import (HYPERPARAM_CONFIGS, hyperparam_search_cv,
                     train_lgbm, train_xgboost, save_models)
 from evaluation import (evaluate_baselines, full_evaluate, backtest,
                         shap_analysis, ablation_study)
@@ -116,12 +117,21 @@ def train_pipeline(source):
     # 9. Baselines
     baseline_results = evaluate_baselines(df_train, df_val)
 
-    # 10. Hyperparameter search across 3 configs (saves training curves)
-    print("\n── Hyperparameter Search ───────────────────────")
-    probe_model, hp_results, best_name = hyperparam_search(
-        X_train, y_train, X_val, y_val, feature_cols)
+    # 10. Hyperparameter search via 5-fold GroupKFold CV on train+val
+    #     Grouped by market_id so no market straddles a fold boundary.
+    #     Robust to single-split noise; also reports per-config train/val gap
+    #     as a direct overfitting diagnostic.
+    print("\n── Hyperparameter Search (GroupKFold CV) ───────")
+    df_dev = pd.concat([df_train, df_val])
+    best_name, cv_results = hyperparam_search_cv(df_dev, feature_cols)
 
-    # 11. Feature selection on probe model
+    # 11. Train probe model on train/val with best CV config for feature
+    #     selection. Re-fits one model on the original split so we get gain
+    #     importance consistent with the final training data.
+    print("\n── Probe Model (best config on train/val) ──────")
+    probe_model = train_lgbm(
+        X_train, y_train, X_val, y_val, feature_cols,
+        params_override=HYPERPARAM_CONFIGS[best_name])
     selected_cols, importance = select_features(
         probe_model, feature_cols, X_val, y_val)
 

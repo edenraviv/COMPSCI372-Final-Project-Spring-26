@@ -3,6 +3,8 @@ import numpy as np
 import lightgbm as lgb
 import xgboost as xgb
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
+from sklearn.model_selection import GroupKFold
+from sklearn.preprocessing import StandardScaler
 from data_visualization import _plot_training_curves
 
 
@@ -96,6 +98,123 @@ def hyperparam_search(X_train, y_train, X_val, y_val, feature_cols):
     return best_model, results, best_name
 
 
+def hyperparam_search_cv(df_dev, feature_cols, n_splits=5, seed=42):
+    '''HYPERPARAMETER TUNING via GroupKFold CV — robust config selection.
+
+    Splits the dev set (train+val combined) into n_splits folds grouped by
+    market_id so no market appears in both fold-train and fold-val. Each
+    config is scored by mean val log-loss across folds. Selecting by CV
+    rather than a single val split reduces the risk of tuning to one
+    particular split and gives an uncertainty estimate (±std).
+
+    Also reports the mean train/val gap per config — a direct overfitting
+    diagnostic. Larger gap ⇒ the config is memorizing the training fold.
+
+    Args:
+        df_dev:       DataFrame with market_id, label, and feature_cols
+        feature_cols: list of feature column names
+        n_splits:     number of CV folds (default 5)
+        seed:         base_params seed
+
+    Returns:
+        best_name, cv_results
+    '''
+    base_params = {
+        "objective":    "binary",
+        "metric":       ["binary_logloss", "auc"],
+        "bagging_freq": 5,
+        "verbose":      -1,
+        "seed":         seed,
+    }
+
+    groups = df_dev["market_id"].values
+    y_all  = df_dev["label"].values
+    X_raw  = df_dev[feature_cols].fillna(-999).values
+
+    kf = GroupKFold(n_splits=n_splits)
+    splits = list(kf.split(X_raw, groups=groups))
+
+    cv_results       = {}
+    first_fold_evals = {}
+
+    for name, cfg in HYPERPARAM_CONFIGS.items():
+        params      = {**base_params, **cfg}
+        fold_val_ll = []
+        fold_tr_ll  = []
+        fold_auc    = []
+        fold_brier  = []
+        fold_gap    = []
+        fold_iters  = []
+
+        for fold_idx, (tr_idx, va_idx) in enumerate(splits):
+            # Per-fold scaler — fit on fold-train only (no CV leakage)
+            scaler = StandardScaler()
+            X_tr   = scaler.fit_transform(X_raw[tr_idx])
+            X_va   = scaler.transform(X_raw[va_idx])
+            y_tr   = y_all[tr_idx]
+            y_va   = y_all[va_idx]
+
+            dtrain = lgb.Dataset(X_tr, label=y_tr, feature_name=feature_cols)
+            dval   = lgb.Dataset(X_va, label=y_va, reference=dtrain,
+                                 feature_name=feature_cols)
+
+            evals_result = {}
+            model = lgb.train(
+                params, dtrain, num_boost_round=500,
+                valid_sets=[dtrain, dval], valid_names=["train", "val"],
+                callbacks=[
+                    lgb.early_stopping(stopping_rounds=30, verbose=False),
+                    lgb.log_evaluation(period=9999),
+                    lgb.record_evaluation(evals_result),
+                ],
+            )
+
+            best_iter = model.best_iteration
+            tr_loss   = evals_result["train"]["binary_logloss"][best_iter - 1]
+            va_loss   = evals_result["val"]["binary_logloss"][best_iter - 1]
+
+            probs = model.predict(X_va)
+            fold_val_ll.append(log_loss(y_va, probs))
+            fold_tr_ll.append(tr_loss)
+            fold_auc.append(roc_auc_score(y_va, probs))
+            fold_brier.append(brier_score_loss(y_va, probs))
+            fold_gap.append(va_loss - tr_loss)
+            fold_iters.append(best_iter)
+
+            if fold_idx == 0:
+                first_fold_evals[name] = evals_result
+
+        cv_results[name] = {
+            "mean_val_loss":   float(np.mean(fold_val_ll)),
+            "std_val_loss":    float(np.std(fold_val_ll)),
+            "mean_train_loss": float(np.mean(fold_tr_ll)),
+            "mean_gap":        float(np.mean(fold_gap)),
+            "mean_auc":        float(np.mean(fold_auc)),
+            "mean_brier":      float(np.mean(fold_brier)),
+            "mean_best_iter":  float(np.mean(fold_iters)),
+            "fold_val_losses": fold_val_ll,
+        }
+
+    best_name = min(cv_results, key=lambda k: cv_results[k]["mean_val_loss"])
+
+    print(f"\n── Hyperparameter Search Results "
+          f"({n_splits}-fold GroupKFold CV) ──")
+    print(f"  {'Config':<26} {'Val LL (±std)':>16} {'Train LL':>10} "
+          f"{'Gap':>7} {'AUC':>7} {'Iters':>6}")
+    print("  " + "─" * 76)
+    for name, m in cv_results.items():
+        marker = " ◀ best" if name == best_name else ""
+        ll_str = f"{m['mean_val_loss']:.4f}±{m['std_val_loss']:.4f}"
+        print(f"  {name:<26} {ll_str:>16} {m['mean_train_loss']:>10.4f} "
+              f"{m['mean_gap']:>7.4f} {m['mean_auc']:>7.4f} "
+              f"{m['mean_best_iter']:>6.0f}{marker}")
+    print("  (Gap = val − train log-loss at best iter; "
+          "larger ⇒ more overfitting)")
+
+    _plot_training_curves(first_fold_evals)
+    return best_name, cv_results
+
+
 def train_lgbm(X_train, y_train, X_val, y_val,
                feature_cols, params_override=None):
     '''TRAIN LIGHTGBM (final model on selected features).'''
@@ -119,15 +238,22 @@ def train_lgbm(X_train, y_train, X_val, y_val,
     dval   = lgb.Dataset(X_val,   label=y_val,   reference=dtrain,
                          feature_name=feature_cols)
 
+    evals_result = {}
     model = lgb.train(
         base_params, dtrain, num_boost_round=500,
         valid_sets=[dtrain, dval], valid_names=["train", "val"],
         callbacks=[
             lgb.early_stopping(stopping_rounds=30, verbose=False),
             lgb.log_evaluation(period=50),
+            lgb.record_evaluation(evals_result),
         ],
     )
-    print(f"  LightGBM best iteration: {model.best_iteration}")
+    best_iter = model.best_iteration
+    tr_loss   = evals_result["train"]["binary_logloss"][best_iter - 1]
+    va_loss   = evals_result["val"]["binary_logloss"][best_iter - 1]
+    print(f"  LightGBM best iteration: {best_iter}")
+    print(f"  LightGBM train LL: {tr_loss:.4f} | val LL: {va_loss:.4f} | "
+          f"gap: {va_loss - tr_loss:+.4f}")
     return model
 
 
@@ -154,7 +280,12 @@ def train_xgboost(X_train, y_train, X_val, y_val):
         evals_result=evals_result,
         verbose_eval=False,
     )
-    print(f"  XGBoost best iteration: {model.best_iteration}")
+    best_iter = model.best_iteration
+    tr_loss   = evals_result["train"]["logloss"][best_iter]
+    va_loss   = evals_result["val"]["logloss"][best_iter]
+    print(f"  XGBoost best iteration: {best_iter}")
+    print(f"  XGBoost train LL: {tr_loss:.4f} | val LL: {va_loss:.4f} | "
+          f"gap: {va_loss - tr_loss:+.4f}")
     return model
 
 
