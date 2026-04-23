@@ -205,9 +205,11 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df["log_volume"]   = np.log1p(df["volume"])
     df["log_oi"]       = np.log1p(df["open_interest"])
 
-    # Time — end_period_ts is present in every candle, safe at inference
-    df["ts"]              = df["ds"].astype(np.int64) // 10**9
-    df["hours_to_expiry"] = (df["end_period_ts"] - df["ts"]) / 3600
+    # end_period_ts = end of this candle, not market expiry
+    # So we use the last candle's ds per market as a proxy for expiry
+    df["market_end_ts"] = df.groupby("market_id")["ds"].transform("max")
+    df["hours_to_expiry"] = (df["market_end_ts"] - df["ds"]).dt.total_seconds() / 3600
+
     df["is_final_3h"]     = (df["hours_to_expiry"] <= 3).astype(int)
     df["is_final_1h"]     = (df["hours_to_expiry"] <= 1).astype(int)
     df["hour_index"]      = g.cumcount()
@@ -1036,7 +1038,14 @@ def train_pipeline(source):
     df = engineer_features(df)
 
     print(df["hours_to_expiry"].describe())
-    
+
+    # Filter to candles with more than 6 hours remaining
+    # Forces model to learn from price movement, not temporal certainty
+    before = len(df)
+    df = df[df["hours_to_expiry"] > 6]
+    print(f"Rows after <6h filter: {len(df)} (dropped {before - len(df)})")
+
+
     # 6. Drop rows without a label
     df = df.dropna(subset=["label"])
     print(f"Rows after dropping unlabeled: {len(df)}")
