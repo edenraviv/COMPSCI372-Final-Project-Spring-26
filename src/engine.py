@@ -55,7 +55,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 from data_ingestion import load_raw
-from utils.pre_processing import preprocess
+from pre_processing import preprocess
 
 warnings.filterwarnings("ignore")
 
