@@ -1,5 +1,46 @@
-
 import pandas as pd
+import numpy as np
+
+def _to_float(val):
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return np.nan
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. FLATTEN TO DATAFRAME
+# One row per candle. Extracts all price/volume/bid/ask fields.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def flatten(raw: dict) -> pd.DataFrame:
+    rows = []
+    for market_id, candles in raw.items():
+        for c in candles:
+            row = {
+                "market_id":     market_id,
+                "ds":            pd.to_datetime(c["ds"]),
+                "close":         c.get("close"),
+                "high":          c.get("high"),
+                "low":           c.get("low"),
+                "label":         c.get("label"),
+                "volume":        float(c.get("volume_fp") or 0),
+                "open_interest": float(c.get("open_interest_fp") or 0),
+                "end_period_ts": c.get("end_period_ts"),
+                "ask_close":     _to_float(c.get("yes_ask", {}).get("close_dollars")),
+                "ask_high":      _to_float(c.get("yes_ask", {}).get("high_dollars")),
+                "ask_low":       _to_float(c.get("yes_ask", {}).get("low_dollars")),
+                "bid_close":     _to_float(c.get("yes_bid", {}).get("close_dollars")),
+                "bid_high":      _to_float(c.get("yes_bid", {}).get("high_dollars")),
+                "bid_low":       _to_float(c.get("yes_bid", {}).get("low_dollars")),
+                "price_mean":    _to_float(c.get("price", {}).get("mean_dollars")),
+            }
+            rows.append(row)
+
+    df = (pd.DataFrame(rows)
+            .sort_values(["market_id", "ds"])
+            .reset_index(drop=True))
+    return df
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 4. PREPROCESSING

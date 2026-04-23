@@ -52,7 +52,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 from data_ingestion import load_raw
-from pre_processing import preprocess
+from pre_processing import preprocess, flatten, _to_float
 from kalshi_client import KalshiClient
 from evaluation import ablation_study, _error_analysis
 from data_visualization import _plot_feature_importance, _plot_training_curves
@@ -68,48 +68,6 @@ SCALER_PATH     = "kalshi_scaler.pkl"
 TRAIN_RATIO = 0.70
 VAL_RATIO   = 0.15
 TEST_RATIO  = 0.15
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 2. FLATTEN TO DATAFRAME
-# One row per candle. Extracts all price/volume/bid/ask fields.
-# ══════════════════════════════════════════════════════════════════════════════
-
-def flatten(raw: dict) -> pd.DataFrame:
-    rows = []
-    for market_id, candles in raw.items():
-        for c in candles:
-            row = {
-                "market_id":     market_id,
-                "ds":            pd.to_datetime(c["ds"]),
-                "close":         c.get("close"),
-                "high":          c.get("high"),
-                "low":           c.get("low"),
-                "label":         c.get("label"),
-                "volume":        float(c.get("volume_fp") or 0),
-                "open_interest": float(c.get("open_interest_fp") or 0),
-                "end_period_ts": c.get("end_period_ts"),
-                "ask_close":     _to_float(c.get("yes_ask", {}).get("close_dollars")),
-                "ask_high":      _to_float(c.get("yes_ask", {}).get("high_dollars")),
-                "ask_low":       _to_float(c.get("yes_ask", {}).get("low_dollars")),
-                "bid_close":     _to_float(c.get("yes_bid", {}).get("close_dollars")),
-                "bid_high":      _to_float(c.get("yes_bid", {}).get("high_dollars")),
-                "bid_low":       _to_float(c.get("yes_bid", {}).get("low_dollars")),
-                "price_mean":    _to_float(c.get("price", {}).get("mean_dollars")),
-            }
-            rows.append(row)
-
-    df = (pd.DataFrame(rows)
-            .sort_values(["market_id", "ds"])
-            .reset_index(drop=True))
-    return df
-
-
-def _to_float(val):
-    try:
-        return float(val)
-    except (TypeError, ValueError):
-        return np.nan
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 3. DROP RESOLUTION CANDLE

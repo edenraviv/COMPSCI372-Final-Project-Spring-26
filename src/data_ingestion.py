@@ -46,7 +46,7 @@ def is_valid_market(m: dict, question) -> bool:
     
     return False
 
-def build_resolved_samples(markets_json : list[dict]):
+def build_resolved_market_samples(markets_json : list[dict]):
     """
     Builds training samples ONLY from closed/determined/settled  markets.
     """

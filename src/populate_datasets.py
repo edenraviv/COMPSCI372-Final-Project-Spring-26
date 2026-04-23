@@ -6,7 +6,7 @@ client = KalshiClient()
 markets = client.get_all_training_data(1000000)
 
 # 3. Try building samples from that same batch
-samples = di.build_resolved_samples(markets)
+samples = di.build_resolved_market_samples(markets)
 print(f"\nSamples built: {len(samples)}")
 
 di.write_to_file([s.__dict__ for (s, _) in samples], "data/processed_market_data.json")

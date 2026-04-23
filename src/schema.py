@@ -2,11 +2,6 @@
 from dataclasses import dataclass
 from typing import Optional
 
-
-# ---------------------------------------------------------------------------
-# Data Contract
-# ---------------------------------------------------------------------------
-
 @dataclass
 class MarketFeatures:
     """
@@ -23,10 +18,6 @@ class MarketFeatures:
     rag_query: Optional[str] = None             # Defaults to market_id if None
     label: Optional[float] = None              # Ground truth: 1.0 = YES resolved, 0.0 = NO
 
-
-# ---------------------------------------------------------------------------
-# Timeseries Schema
-# ---------------------------------------------------------------------------
 
 N_CANDLE_FEATURES = 16  # number of numeric features per candle (see _candle_to_row)
 
