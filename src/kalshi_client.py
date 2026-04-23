@@ -55,7 +55,6 @@ class KalshiClient:
         for attempt in range(retries):
             headers = self._sign_request("GET", path)
             r = requests.get(url, headers=headers, params=params)
-
             if r.status_code == 429:
                 wait = 2 ** attempt
                 print(f"Rate limited on {path}, waiting {wait}s (attempt {attempt+1}/{retries})")
@@ -150,7 +149,7 @@ class KalshiClient:
         candles = []
         try:
             current_market_response = self.get(f"/series/{series_ticker}/markets/{ticker}/candlesticks", params)
-            candles = current_market_response.get("candles", [])
+            candles = current_market_response.get("candlesticks", [])
         except Exception:
             pass
 

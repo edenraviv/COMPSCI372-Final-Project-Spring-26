@@ -24,7 +24,13 @@ def main():
     parser = argparse.ArgumentParser(
         description="Predict YES probability for a Kalshi market ticker.")
     parser.add_argument(
-        "ticker",
+        "series_ticker",
+        help="Full Kalshi market ticker — either KXSERIES-YYMMMDD "
+             "(e.g. KXVOTEHUBTRUMPUPDOWN-26APR23) or "
+             "KXSERIES-YYMMMDD-SUBJECT (e.g. KXTRUMPMENTION-26FEB19-AFRI). "
+             "A series ticker on its own (e.g. KXTRUMPREMOVE) will not work.")
+    parser.add_argument(
+        "market_ticker",
         help="Full Kalshi market ticker — either KXSERIES-YYMMMDD "
              "(e.g. KXVOTEHUBTRUMPUPDOWN-26APR23) or "
              "KXSERIES-YYMMMDD-SUBJECT (e.g. KXTRUMPMENTION-26FEB19-AFRI). "
@@ -32,23 +38,20 @@ def main():
     args = parser.parse_args()
 
     try:
-        predict_live(args.ticker)
+        predict_live(args.market_ticker, args.series_ticker)
     except FileNotFoundError as e:
         print(f"Error: missing trained model artifact — {e}", file=sys.stderr)
         print("Run `python src/main.py` first to train and save models.",
               file=sys.stderr)
         sys.exit(1)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
     except HTTPError as e:
         status = e.response.status_code if e.response is not None else "?"
         if status == 404:
             print(f"Error: Kalshi API returned 404 for ticker "
-                  f"'{args.ticker}'.", file=sys.stderr)
-            print("Expected a full market ticker — either "
-                  "KXSERIES-YYMMMDD (e.g. KXVOTEHUBTRUMPUPDOWN-26APR23) "
-                  "or KXSERIES-YYMMMDD-SUBJECT "
-                  "(e.g. KXTRUMPMENTION-26FEB19-AFRI).", file=sys.stderr)
-            print("A series-only ticker (e.g. KXTRUMPREMOVE) is not a "
-                  "market and has no candles.", file=sys.stderr)
+                  f"'{args.market_ticker}'.", file=sys.stderr)
         else:
             print(f"Kalshi API error ({status}): {e}", file=sys.stderr)
         sys.exit(1)

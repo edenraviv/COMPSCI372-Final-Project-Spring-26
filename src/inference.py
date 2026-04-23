@@ -18,14 +18,11 @@ def get_and_format_candles(ticker: str, series_ticker: str = None,
 
     if end is None:
         end = int(time.time())
+        print(end)
     if start is None:
-        start = end - 7 * 24 * 3600
+        start = end - 100 * 24 * 3600
+        print(start)
 
-    # Kalshi market tickers are <SERIES>-<EVENT>[-<SUBJECT>]; the live
-    # /series/{series}/markets/{ticker}/candlesticks endpoint needs the
-    # series. Derive it from the first segment when the caller didn't
-    # pass one, so live markets don't fall through to the historical
-    # endpoint (which only serves settled markets).
     if series_ticker is None:
         series_ticker = ticker.split("-", 1)[0]
 
@@ -33,6 +30,11 @@ def get_and_format_candles(ticker: str, series_ticker: str = None,
         series_ticker=series_ticker, ticker=ticker,
         start=start, end=end, period=period,
     )
+
+    if not raw_candles:
+        raise ValueError(
+            f"No candles returned for ticker '{ticker}'. Verify the "
+            f"ticker exists and has trade history.")
 
     formatted = []
     for c in raw_candles:
@@ -68,7 +70,7 @@ def get_and_format_candles(ticker: str, series_ticker: str = None,
     return {ticker: formatted}
 
 
-def predict_live(ticker_or_raw,
+def predict_live(market_ticker_or_raw, series_ticker=None,
                  lgbm_model=None, xgb_model=None,
                  scaler=None, feature_cols=None):
     """
@@ -96,12 +98,12 @@ def predict_live(ticker_or_raw,
     if lgbm_model is None:
         lgbm_model, xgb_model, scaler, feature_cols = load_models()
 
-    if isinstance(ticker_or_raw, str):
-        ticker = ticker_or_raw
+    if isinstance(market_ticker_or_raw, str):
+        ticker = market_ticker_or_raw
         print(f"Fetching live candles for {ticker}...")
-        raw = get_and_format_candles(ticker)
+        raw = get_and_format_candles(ticker, series_ticker)
     else:
-        raw    = ticker_or_raw
+        raw    = market_ticker_or_raw
         ticker = list(raw.keys())[0]
 
     # Same pipeline as training — no resolution candle drop at inference
