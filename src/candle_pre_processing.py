@@ -6,13 +6,10 @@ def _to_float(val):
         return float(val)
     except (TypeError, ValueError):
         return np.nan
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 2. FLATTEN TO DATAFRAME
-# One row per candle. Extracts all price/volume/bid/ask fields.
-# ══════════════════════════════════════════════════════════════════════════════
+    
 
 def flatten(raw: dict) -> pd.DataFrame:
+    '''One row per candle. Extracts all price/volume/bid/ask fields.'''
     rows = []
     for market_id, candles in raw.items():
         for c in candles:
@@ -42,24 +39,19 @@ def flatten(raw: dict) -> pd.DataFrame:
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 4. PREPROCESSING
-#
-# Two documented data quality challenges:
-#
-#   Challenge 1 — Missing values
-#     Many early candles have no price_mean, bid_close, or ask_close because
-#     the market has no trades yet. We flag these with indicator columns before
-#     filling with sentinel (-999 at scaling time) so the model can learn that
-#     missingness itself is informative (thin/new market).
-#
-#   Challenge 2 — Volume/OI outliers
-#     Resolution-hour volume spikes can be 100x the typical hourly volume.
-#     Left uncapped these dominate tree splits. We clip at the per-market 99th
-#     percentile, computed on training data only to prevent leakage.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def preprocess(df: pd.DataFrame) -> pd.DataFrame:
+    '''Two documented data quality challenges:
+    Challenge 1 — Missing values
+    Many early candles have no price_mean, bid_close, or ask_close because
+    the market has no trades yet. We flag these with indicator columns before
+    filling with sentinel (-999 at scaling time) so the model can learn that
+    missingness itself is informative (thin/new market).
+
+    Challenge 2 — Volume/OI outliers
+    Resolution-hour volume spikes can be 100x the typical hourly volume.
+    Left uncapped these dominate tree splits. We clip at the per-market 99th
+    percentile, computed on training data only to prevent leakage.'''
+    
     df = df.copy()
 
     # Challenge 1: flag missing prices before sentinel fill
@@ -74,3 +66,14 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
         df[col] = df[col].clip(upper=p99)
 
     return df
+
+def drop_resolution_candle(df: pd.DataFrame) -> pd.DataFrame:
+    '''The final candle of each market is the resolution candle — price has already
+    collapsed to $0.01 (NO) or risen to $1.00 (YES). This candle is never
+    available at inference time on a live market, so dropping it keeps training
+    and inference consistent and prevents label leakage via the final price.'''
+    
+    mask = df.groupby("market_id").cumcount(ascending=False) > 0
+    dropped = (~mask).sum()
+    print(f"Dropped {dropped} resolution candles (1 per market)")
+    return df[mask].reset_index(drop=True)

@@ -1,4 +1,3 @@
-import json
 import time
 import requests
 import pandas as pd
@@ -6,14 +5,12 @@ from datetime import datetime
 from kalshi_client import KalshiClient
 from data_ingestion import write_to_file, read_from_json_file
 
-
 # -----------------------------
 # 3. Convert ISO string → Unix timestamp (int seconds)
 # -----------------------------
 def to_unix(ts_str: str) -> int:
     dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
     return int(dt.timestamp())
-
 
 # -----------------------------
 # 4. Convert candles response → DataFrame

@@ -52,7 +52,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 from data_ingestion import load_raw
-from pre_processing import preprocess, flatten, _to_float
+from pre_processing import preprocess, flatten, _to_float, drop_resolution_candle
 from kalshi_client import KalshiClient
 from evaluation import ablation_study, _error_analysis
 from data_visualization import _plot_feature_importance, _plot_training_curves
@@ -68,21 +68,6 @@ SCALER_PATH     = "kalshi_scaler.pkl"
 TRAIN_RATIO = 0.70
 VAL_RATIO   = 0.15
 TEST_RATIO  = 0.15
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 3. DROP RESOLUTION CANDLE
-#
-# The final candle of each market is the resolution candle — price has already
-# collapsed to $0.01 (NO) or risen to $1.00 (YES). This candle is never
-# available at inference time on a live market, so dropping it keeps training
-# and inference consistent and prevents label leakage via the final price.
-# ══════════════════════════════════════════════════════════════════════════════
-
-def drop_resolution_candle(df: pd.DataFrame) -> pd.DataFrame:
-    mask = df.groupby("market_id").cumcount(ascending=False) > 0
-    dropped = (~mask).sum()
-    print(f"Dropped {dropped} resolution candles (1 per market)")
-    return df[mask].reset_index(drop=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
