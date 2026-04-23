@@ -159,7 +159,7 @@ def train_pipeline(source):
         X_test_s, y_test, baseline_results)
 
     # 17. Backtesting simulation
-    backtest(df_test, ens_probs, threshold=0.65)
+    backtest(df_test, ens_probs, threshold=0.55)
 
     # 18. Ablation study
     ablation_study(df_train, df_val, feature_cols)
