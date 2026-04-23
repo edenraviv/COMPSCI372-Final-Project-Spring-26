@@ -115,14 +115,14 @@ def save(out, path="data/market_timeseries.json"):
     write_to_file(serializable, path)
     print(f"Saved {len(serializable)} time series to {path}")
 
-# -----------------------------
-# 8. Run
-# -----------------------------
-if __name__ == "__main__":
+def run(raw_path: str = "data/raw_market_data.json",
+        processed_path: str = "data/processed_market_data.json",
+        out_path: str = "data/market_timeseries.json"):
+    '''Build hourly candle time series for every raw market and save to JSON.'''
     client = KalshiClient()
 
-    raw_markets = read_from_json_file("data/raw_market_data.json")
-    processed_markets = read_from_json_file("data/processed_market_data.json")
+    raw_markets = read_from_json_file(raw_path)
+    processed_markets = read_from_json_file(processed_path)
 
     print(f"Raw markets: {len(raw_markets)}")
     print(f"Processed markets: {len(processed_markets)}")
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     # Check a sample label_map entry
     label_map = {m["market_id"]: m["label"] for m in processed_markets}
     print(f"Label map size: {len(label_map)}")
-    
+
     # Check a sample raw market has the keys we need
     sample = raw_markets[0]
     print(f"Sample raw market keys: {list(sample.keys())}")
@@ -142,4 +142,9 @@ if __name__ == "__main__":
 
     ts = build_all(client, raw_markets, processed_markets)
     print(f"\nBuilt {len(ts)} time series")
-    save(ts)
+    save(ts, out_path)
+    return out_path
+
+
+if __name__ == "__main__":
+    run()
