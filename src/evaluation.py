@@ -1,13 +1,13 @@
 
 import matplotlib.pyplot as plt
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
-import time
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
 from schema import FEATURE_GROUPS
 from data_visualization import PLOTS_DIR
+import shap
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 15. ERROR ANALYSIS — failure case breakdown with visualization
@@ -139,3 +139,34 @@ def ablation_study(df_train, df_val, feature_cols):
     tbl.to_csv(path, index=False)
     print(f"  Ablation table saved → {path}")
     return tbl
+
+def shap_analysis(model, X_val: np.ndarray,
+                  feature_cols: list, n_samples: int = 200):
+    '''SHAP INTERPRETABILITY
+
+    TreeExplainer computes exact Shapley values for tree models.
+    Top drivers in political markets:
+    hours_to_expiry — biggest driver; probability collapses near resolution
+    bid_ask_spread  — wide spread signals high uncertainty → lower YES prob
+    close_is_floor  — $0.01 price is a near-certain NO signal
+    momentum_1h     — recent direction strongly predicts continuation'''
+    
+    print("\n── SHAP Interpretability ───────────────────────")
+    sample      = X_val[:min(n_samples, len(X_val))]
+    explainer   = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(sample)
+    sv = shap_values[1] if isinstance(shap_values, list) else shap_values
+
+    fig, _ = plt.subplots(figsize=(8, 6))
+    shap.summary_plot(sv, sample, feature_names=feature_cols, show=False)
+    plt.title("SHAP Summary — Impact on YES Probability")
+    plt.tight_layout()
+    path = PLOTS_DIR / "shap_summary.png"
+    plt.savefig(path, dpi=120, bbox_inches="tight")
+    plt.close()
+    print(f"  SHAP summary plot saved → {path}")
+
+    top5 = (pd.Series(np.abs(sv).mean(axis=0), index=feature_cols)
+              .sort_values(ascending=False).head(5))
+    print("  Top 5 features by mean |SHAP|:")
+    print(top5.to_string())

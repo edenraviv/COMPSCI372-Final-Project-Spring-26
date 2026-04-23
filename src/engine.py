@@ -44,17 +44,15 @@ import numpy as np
 import pandas as pd
 import lightgbm as lgb
 import xgboost as xgb
-import shap
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 from data_ingestion import load_raw
-from pre_processing import preprocess, flatten, _to_float, drop_resolution_candle
+from candle_pre_processing import preprocess, flatten, _to_float, drop_resolution_candle, three_way_split
 from kalshi_client import KalshiClient
-from evaluation import ablation_study, _error_analysis
+from evaluation import ablation_study, _error_analysis, shap_analysis
 from data_visualization import _plot_feature_importance, _plot_training_curves
 from schema import ALL_FEATURE_COLS
 from data_visualization import PLOTS_DIR
@@ -64,10 +62,6 @@ warnings.filterwarnings("ignore")
 MODEL_LGBM_PATH = "kalshi_lgbm.txt"
 MODEL_XGB_PATH  = "kalshi_xgb.json"
 SCALER_PATH     = "kalshi_scaler.pkl"
-
-TRAIN_RATIO = 0.70
-VAL_RATIO   = 0.15
-TEST_RATIO  = 0.15
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -143,42 +137,6 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = 0
 
     return df
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 6. TRAIN / VAL / TEST SPLIT — 70 / 15 / 15
-#
-# GroupShuffleSplit ensures all candles from a market stay in one partition.
-# This prevents the model seeing future candles of a market in training while
-# evaluating on earlier candles of the same market (temporal leakage).
-# ══════════════════════════════════════════════════════════════════════════════
-
-def three_way_split(df: pd.DataFrame, seed: int = 42):
-    groups = df["market_id"].values
-
-    spl1 = GroupShuffleSplit(n_splits=1, test_size=TEST_RATIO,
-                             random_state=seed)
-    tv_idx, test_idx = next(spl1.split(df, groups=groups))
-    df_tv   = df.iloc[tv_idx]
-    df_test = df.iloc[test_idx]
-
-    val_of_tv = VAL_RATIO / (TRAIN_RATIO + VAL_RATIO)
-    spl2 = GroupShuffleSplit(n_splits=1, test_size=val_of_tv,
-                             random_state=seed)
-    tr_idx, val_idx = next(spl2.split(df_tv,
-                                      groups=df_tv["market_id"].values))
-    df_train = df_tv.iloc[tr_idx]
-    df_val   = df_tv.iloc[val_idx]
-
-    n = len(df)
-    print(f"\nSplit — Train {TRAIN_RATIO:.0%} / Val {VAL_RATIO:.0%}"
-          f" / Test {TEST_RATIO:.0%}")
-    for name, part in [("Train", df_train), ("Val", df_val),
-                        ("Test",  df_test)]:
-        print(f"  {name:<5}: {len(part):>5} rows | "
-              f"{part['market_id'].nunique():>3} markets | "
-              f"{len(part)/n*100:.1f}%")
-    return df_train, df_val, df_test
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -433,39 +391,6 @@ def ensemble_predict(lgbm_model, xgb_model, X, lgbm_weight=0.6):
     lgbm_probs = lgbm_model.predict(X)
     xgb_probs  = xgb_model.predict(xgb.DMatrix(X))
     return lgbm_weight * lgbm_probs + (1 - lgbm_weight) * xgb_probs
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 16. SHAP INTERPRETABILITY
-#
-# TreeExplainer computes exact Shapley values for tree models.
-# Top drivers in political markets:
-#   hours_to_expiry — biggest driver; probability collapses near resolution
-#   bid_ask_spread  — wide spread signals high uncertainty → lower YES prob
-#   close_is_floor  — $0.01 price is a near-certain NO signal
-#   momentum_1h     — recent direction strongly predicts continuation
-# ══════════════════════════════════════════════════════════════════════════════
-
-def shap_analysis(model, X_val: np.ndarray,
-                  feature_cols: list, n_samples: int = 200):
-    print("\n── SHAP Interpretability ───────────────────────")
-    sample      = X_val[:min(n_samples, len(X_val))]
-    explainer   = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(sample)
-    sv = shap_values[1] if isinstance(shap_values, list) else shap_values
-
-    fig, _ = plt.subplots(figsize=(8, 6))
-    shap.summary_plot(sv, sample, feature_names=feature_cols, show=False)
-    plt.title("SHAP Summary — Impact on YES Probability")
-    plt.tight_layout()
-    path = PLOTS_DIR / "shap_summary.png"
-    plt.savefig(path, dpi=120, bbox_inches="tight")
-    plt.close()
-    print(f"  SHAP summary plot saved → {path}")
-
-    top5 = (pd.Series(np.abs(sv).mean(axis=0), index=feature_cols)
-              .sort_values(ascending=False).head(5))
-    print("  Top 5 features by mean |SHAP|:")
-    print(top5.to_string())
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -1,5 +1,10 @@
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import GroupShuffleSplit
+
+TRAIN_RATIO = 0.70
+VAL_RATIO   = 0.15
+TEST_RATIO  = 0.15
 
 def _to_float(val):
     try:
@@ -77,3 +82,40 @@ def drop_resolution_candle(df: pd.DataFrame) -> pd.DataFrame:
     dropped = (~mask).sum()
     print(f"Dropped {dropped} resolution candles (1 per market)")
     return df[mask].reset_index(drop=True)
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. TRAIN / VAL / TEST SPLIT — 70 / 15 / 15
+#
+# GroupShuffleSplit ensures all candles from a market stay in one partition.
+# This prevents the model seeing future candles of a market in training while
+# evaluating on earlier candles of the same market (temporal leakage).
+# ══════════════════════════════════════════════════════════════════════════════
+
+def three_way_split(df: pd.DataFrame, seed: int = 42):
+    groups = df["market_id"].values
+
+    spl1 = GroupShuffleSplit(n_splits=1, test_size=TEST_RATIO,
+                             random_state=seed)
+    tv_idx, test_idx = next(spl1.split(df, groups=groups))
+    df_tv   = df.iloc[tv_idx]
+    df_test = df.iloc[test_idx]
+
+    val_of_tv = VAL_RATIO / (TRAIN_RATIO + VAL_RATIO)
+    spl2 = GroupShuffleSplit(n_splits=1, test_size=val_of_tv,
+                             random_state=seed)
+    tr_idx, val_idx = next(spl2.split(df_tv,
+                                      groups=df_tv["market_id"].values))
+    df_train = df_tv.iloc[tr_idx]
+    df_val   = df_tv.iloc[val_idx]
+
+    n = len(df)
+    print(f"\nSplit — Train {TRAIN_RATIO:.0%} / Val {VAL_RATIO:.0%}"
+          f" / Test {TEST_RATIO:.0%}")
+    for name, part in [("Train", df_train), ("Val", df_val),
+                        ("Test",  df_test)]:
+        print(f"  {name:<5}: {len(part):>5} rows | "
+              f"{part['market_id'].nunique():>3} markets | "
+              f"{len(part)/n*100:.1f}%")
+    return df_train, df_val, df_test
