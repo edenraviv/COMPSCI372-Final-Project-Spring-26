@@ -1,6 +1,7 @@
 from schema import MarketFeatures, CandleFeatures, TimeseriesSample
 import json
 import re
+from pathlib import Path
 
 MAX_SAMPLES = 3000
 
@@ -208,3 +209,23 @@ def append_to_file(data, file):
 def read_from_json_file(file):
     with open(file, "r") as f:
         return json.load(f)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. LOAD RAW DATA
+# Accepts: dict, path to JSON file, or path to directory of JSON files
+# ══════════════════════════════════════════════════════════════════════════════
+
+def load_raw(source) -> dict:
+    if isinstance(source, dict):
+        return source
+    path = Path(source)
+    if path.is_file():
+        with open(path) as f:
+            return json.load(f)
+    if path.is_dir():
+        combined = {}
+        for fp in sorted(path.glob("*.json")):
+            with open(fp) as f:
+                combined.update(json.load(f))
+        return combined
+    raise ValueError(f"Cannot load source: {source}")

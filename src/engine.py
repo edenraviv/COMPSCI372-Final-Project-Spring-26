@@ -55,6 +55,7 @@ from pathlib import Path
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
+from data_ingestion import load_raw
 
 warnings.filterwarnings("ignore")
 
@@ -70,27 +71,6 @@ VAL_RATIO   = 0.15
 TEST_RATIO  = 0.15
 
 KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 1. LOAD RAW DATA
-# Accepts: dict, path to JSON file, or path to directory of JSON files
-# ══════════════════════════════════════════════════════════════════════════════
-
-def load_raw(source) -> dict:
-    if isinstance(source, dict):
-        return source
-    path = Path(source)
-    if path.is_file():
-        with open(path) as f:
-            return json.load(f)
-    if path.is_dir():
-        combined = {}
-        for fp in sorted(path.glob("*.json")):
-            with open(fp) as f:
-                combined.update(json.load(f))
-        return combined
-    raise ValueError(f"Cannot load source: {source}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1090,6 +1070,8 @@ def train_pipeline(source):
     # 5. Engineer features (35+ backward-looking features)
     df = engineer_features(df)
 
+    print(df["hours_to_expiry"].describe())
+    
     # 6. Drop rows without a label
     df = df.dropna(subset=["label"])
     print(f"Rows after dropping unlabeled: {len(df)}")
