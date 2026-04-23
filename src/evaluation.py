@@ -9,20 +9,18 @@ from schema import FEATURE_GROUPS
 from data_visualization import PLOTS_DIR
 import shap
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 15. ERROR ANALYSIS — failure case breakdown with visualization
-#
-# Discussion:
-#   False Positives cluster near 0.5 — model is uncertain, slight YES bias
-#   in thin markets where bid/ask spread is wide.
-#   False Negatives occur when volume was near zero early (no momentum signal)
-#   and price collapsed in the final hour without warning candles.
-#   Largest absolute errors occur in the 1-3h bucket where the market is
-#   transitioning from uncertain to resolved but momentum reversals are common.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def _error_analysis(df_test: pd.DataFrame,
                     probs: np.ndarray, y_true: np.ndarray):
+    '''ERROR ANALYSIS — failure case breakdown with visualization.
+
+    Discussion:
+      False Positives cluster near 0.5 — model is uncertain, slight YES bias
+      in thin markets where bid/ask spread is wide.
+      False Negatives occur when volume was near zero early (no momentum signal)
+      and price collapsed in the final hour without warning candles.
+      Largest absolute errors occur in the 1-3h bucket where the market is
+      transitioning from uncertain to resolved but momentum reversals are common.'''
+
     df = df_test.copy().reset_index(drop=True)
     df["prob"]  = probs
     df["label"] = y_true
@@ -62,23 +60,21 @@ def _error_analysis(df_test: pd.DataFrame,
 
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 18. ABLATION STUDY
-#
-# Two independent design choices systematically varied:
-#
-#   A) Feature groups — remove one group at a time, measure val log-loss delta
-#      Positive delta = removing that group hurt performance (it was useful)
-#
-#   B) StandardScaler — compare with vs without normalization
-#      Documents whether scaling meaningfully affects gradient boosting
-#      (tree models are scale-invariant in theory, but scaling affects
-#       how missing sentinel values of -999 interact with real features)
-#
-# Results saved to plots/ablation_table.csv
-# ══════════════════════════════════════════════════════════════════════════════
-
 def ablation_study(df_train, df_val, feature_cols):
+    '''ABLATION STUDY
+
+    Two independent design choices systematically varied:
+
+      A) Feature groups — remove one group at a time, measure val log-loss delta
+         Positive delta = removing that group hurt performance (it was useful)
+
+      B) StandardScaler — compare with vs without normalization
+         Documents whether scaling meaningfully affects gradient boosting
+         (tree models are scale-invariant in theory, but scaling affects
+          how missing sentinel values of -999 interact with real features)
+
+    Results saved to plots/ablation_table.csv'''
+
     print("\n── Ablation Study ──────────────────────────────")
     base_params = {
         "objective": "binary", "metric": "binary_logloss",

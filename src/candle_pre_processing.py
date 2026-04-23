@@ -84,16 +84,12 @@ def drop_resolution_candle(df: pd.DataFrame) -> pd.DataFrame:
     return df[mask].reset_index(drop=True)
 
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 6. TRAIN / VAL / TEST SPLIT — 70 / 15 / 15
-#
-# GroupShuffleSplit ensures all candles from a market stay in one partition.
-# This prevents the model seeing future candles of a market in training while
-# evaluating on earlier candles of the same market (temporal leakage).
-# ══════════════════════════════════════════════════════════════════════════════
-
 def three_way_split(df: pd.DataFrame, seed: int = 42):
+    '''TRAIN / VAL / TEST SPLIT — 70 / 15 / 15
+    GroupShuffleSplit ensures all candles from a market stay in one partition.
+    This prevents the model seeing future candles of a market in training while
+    Evaluating on earlier candles of the same market (temporal leakage).'''
+    
     groups = df["market_id"].values
 
     spl1 = GroupShuffleSplit(n_splits=1, test_size=TEST_RATIO,

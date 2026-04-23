@@ -64,19 +64,16 @@ MODEL_XGB_PATH  = "kalshi_xgb.json"
 SCALER_PATH     = "kalshi_scaler.pkl"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 5. FEATURE ENGINEERING — 35+ derived features across 7 groups
-#
-# All features are strictly backward-looking — only use data available at or
-# before the current candle. Safe to compute on a live market mid-life.
-#
-# Intentionally excluded:
-#   total_hours  — requires knowing full market duration in advance
-#   pct_elapsed  — same reason; divides hour_index by total_hours
-# ══════════════════════════════════════════════════════════════════════════════
-
-
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
+    '''FEATURE ENGINEERING — 35+ derived features across 7 groups.
+
+    All features are strictly backward-looking — only use data available at or
+    before the current candle. Safe to compute on a live market mid-life.
+
+    Intentionally excluded:
+      total_hours  — requires knowing full market duration in advance
+      pct_elapsed  — same reason; divides hour_index by total_hours'''
+
     df = df.copy()
     g  = df.groupby("market_id")
 
@@ -139,12 +136,9 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 7. SCALE FEATURES
-# StandardScaler fit on train only — same scaler applied at inference.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def scale_features(df_train, df_val, df_test, feature_cols):
+    '''SCALE FEATURES
+    StandardScaler fit on train only — same scaler applied at inference.'''
     scaler  = StandardScaler()
     X_train = df_train[feature_cols].fillna(-999).values
     X_val   = df_val[feature_cols].fillna(-999).values
@@ -155,17 +149,14 @@ def scale_features(df_train, df_val, df_test, feature_cols):
     return X_train, X_val, X_test, scaler
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 8. BASELINE MODELS
-#
-# Two naive baselines set the floor the ML model must beat:
-#   Constant prior   — always predict the training-set YES rate
-#   Market price     — use the current candle's close price as the probability
-#                      (this is the strongest naive baseline for prediction
-#                       markets, since price already encodes crowd belief)
-# ══════════════════════════════════════════════════════════════════════════════
-
 def evaluate_baselines(df_train, df_val):
+    '''BASELINE MODELS
+
+    Two naive baselines set the floor the ML model must beat:
+      Constant prior   — always predict the training-set YES rate
+      Market price     — use the current candle's close price as the probability
+                         (this is the strongest naive baseline for prediction
+                          markets, since price already encodes crowd belief)'''
     y_val    = df_val["label"].values
     pos_rate = df_train["label"].mean()
 
@@ -188,18 +179,6 @@ def evaluate_baselines(df_train, df_val):
     return results
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 9. HYPERPARAMETER TUNING — 3 configs compared on validation data
-#
-# Config-A: default moderate settings
-# Config-B: deeper trees + stronger regularization
-# Config-C: shallow trees + high learning rate (fast/aggressive)
-#
-# All share the same base params (objective, metric, seed).
-# Best config selected by validation log-loss.
-# Training curves saved for each config → plots/training_curves.png
-# ══════════════════════════════════════════════════════════════════════════════
-
 HYPERPARAM_CONFIGS = {
     "Config-A (default)": {
         "learning_rate": 0.05, "num_leaves": 31,
@@ -220,6 +199,15 @@ HYPERPARAM_CONFIGS = {
 
 
 def hyperparam_search(X_train, y_train, X_val, y_val, feature_cols):
+    '''HYPERPARAMETER TUNING — 3 configs compared on validation data.
+
+    Config-A: default moderate settings
+    Config-B: deeper trees + stronger regularization
+    Config-C: shallow trees + high learning rate (fast/aggressive)
+
+    All share the same base params (objective, metric, seed).
+    Best config selected by validation log-loss.
+    Training curves saved for each config → plots/training_curves.png'''
     base_params = {
         "objective": "binary",
         "metric":    ["binary_logloss", "auc"],
@@ -276,18 +264,15 @@ def hyperparam_search(X_train, y_train, X_val, y_val, feature_cols):
     return best_model, results, best_name
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 10. FEATURE SELECTION — importance-based pruning with documented impact
-#
-# After the initial model is trained, features contributing less than 1% of
-# total gain importance are pruned. This reduces noise, speeds up inference,
-# and often improves generalization on small datasets. The impact on val
-# log-loss is printed for documentation.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def select_features(model, feature_cols: list,
                     X_val=None, y_val=None,
                     threshold_pct: float = 0.001):
+    '''FEATURE SELECTION — importance-based pruning with documented impact.
+
+    After the initial model is trained, features contributing less than 1% of
+    total gain importance are pruned. This reduces noise, speeds up inference,
+    and often improves generalization on small datasets. The impact on val
+    log-loss is printed for documentation.'''
     imp   = pd.Series(model.feature_importance(importance_type="gain"),
                       index=feature_cols)
     total = imp.sum()
@@ -310,12 +295,9 @@ def select_features(model, feature_cols: list,
     return selected, imp
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 11. TRAIN LIGHTGBM (final model on selected features)
-# ══════════════════════════════════════════════════════════════════════════════
-
 def train_lgbm(X_train, y_train, X_val, y_val,
                feature_cols, params_override=None):
+    '''TRAIN LIGHTGBM (final model on selected features).'''
     base_params = {
         "objective":        "binary",
         "metric":           ["binary_logloss", "auc"],
@@ -348,11 +330,8 @@ def train_lgbm(X_train, y_train, X_val, y_val,
     return model
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 12. TRAIN XGBOOST (ensemble partner)
-# ══════════════════════════════════════════════════════════════════════════════
-
 def train_xgboost(X_train, y_train, X_val, y_val):
+    '''TRAIN XGBOOST (ensemble partner).'''
     dtrain = xgb.DMatrix(X_train, label=y_train)
     dval   = xgb.DMatrix(X_val,   label=y_val)
     params = {
@@ -378,33 +357,27 @@ def train_xgboost(X_train, y_train, X_val, y_val):
     return model
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 13. ENSEMBLE — weighted average of LightGBM + XGBoost
-#
-# LightGBM is weighted 60%, XGBoost 40%.
-# Combining two independently-trained gradient boosting models with different
-# implementations (leaf-wise vs depth-wise tree growth) reduces variance and
-# improves calibration on small datasets.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def ensemble_predict(lgbm_model, xgb_model, X, lgbm_weight=0.6):
+    '''ENSEMBLE — weighted average of LightGBM + XGBoost.
+
+    LightGBM is weighted 60%, XGBoost 40%.
+    Combining two independently-trained gradient boosting models with different
+    implementations (leaf-wise vs depth-wise tree growth) reduces variance and
+    improves calibration on small datasets.'''
     lgbm_probs = lgbm_model.predict(X)
     xgb_probs  = xgb_model.predict(xgb.DMatrix(X))
     return lgbm_weight * lgbm_probs + (1 - lgbm_weight) * xgb_probs
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 17. BACKTESTING / SIMULATION
-#
-# Simulates a simple YES/NO betting strategy on held-out test markets.
-# A bet is placed when the model's predicted probability exceeds `threshold`
-# (YES bet) or falls below `1 - threshold` (NO bet).
-# PnL is computed as: payout - cost, where cost = close price * stake.
-# Cumulative PnL plotted to assess real-world viability.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def backtest(df_test: pd.DataFrame, probs: np.ndarray,
              threshold: float = 0.55, stake: float = 1.0):
+    '''BACKTESTING / SIMULATION
+
+    Simulates a simple YES/NO betting strategy on held-out test markets.
+    A bet is placed when the model's predicted probability exceeds `threshold`
+    (YES bet) or falls below `1 - threshold` (NO bet).
+    PnL is computed as: payout - cost, where cost = close price * stake.
+    Cumulative PnL plotted to assess real-world viability.'''
     df = df_test.copy().reset_index(drop=True)
     df["prob"]  = probs
     df["label"] = df["label"].values
@@ -444,17 +417,14 @@ def backtest(df_test: pd.DataFrame, probs: np.ndarray,
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 20. KALSHI API — fetch and format live candles
-#
-# Delegates the HTTP call to KalshiClient.get_candles (RSA-signed, with
-# series→historical fallback) and wraps the raw candles in the training-JSON
-# shape so the same feature pipeline applies.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def get_and_format_candles(ticker: str, series_ticker: str = None,
                    start: int = None, end: int = None,
                    period: int = 60) -> dict:
+    '''KALSHI API — fetch and format live candles.
+
+    Delegates the HTTP call to KalshiClient.get_candles (RSA-signed, with
+    series→historical fallback) and wraps the raw candles in the training-JSON
+    shape so the same feature pipeline applies.'''
     client = KalshiClient()
 
     if end is None:
@@ -500,11 +470,8 @@ def get_and_format_candles(ticker: str, series_ticker: str = None,
 
     return {ticker: formatted}
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 19. SAVE / LOAD
-# ══════════════════════════════════════════════════════════════════════════════
-
 def save_models(lgbm_model, xgb_model, scaler, feature_cols):
+    '''SAVE models and scaler to disk.'''
     lgbm_model.save_model(MODEL_LGBM_PATH)
     xgb_model.save_model(MODEL_XGB_PATH)
     with open(SCALER_PATH, "wb") as f:
@@ -514,6 +481,7 @@ def save_models(lgbm_model, xgb_model, scaler, feature_cols):
 
 
 def load_models():
+    '''LOAD models and scaler from disk.'''
     lgbm_model = lgb.Booster(model_file=MODEL_LGBM_PATH)
     xgb_model  = xgb.Booster()
     xgb_model.load_model(MODEL_XGB_PATH)
@@ -522,12 +490,9 @@ def load_models():
     return lgbm_model, xgb_model, d["scaler"], d["feature_cols"]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 14. FULL EVALUATION — 3 metrics + inference time
-# ══════════════════════════════════════════════════════════════════════════════
-
 def full_evaluate(lgbm_model, xgb_model, df_test,
                   X_test, y_test, baseline_results):
+    '''FULL EVALUATION — 3 metrics + inference time.'''
     def _metrics(probs):
         return {
             "log_loss": log_loss(y_test, probs),
@@ -572,19 +537,15 @@ def full_evaluate(lgbm_model, xgb_model, df_test,
     return ens_probs, ens_m
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 21. INFERENCE
-#
-# Accepts a ticker string (calls Kalshi API) or pre-fetched candle dict.
-# Runs the identical feature pipeline as training.
-# Returns current YES probability from the most recent candle.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def predict_live(ticker_or_raw,
                  lgbm_model=None, xgb_model=None,
                  scaler=None, feature_cols=None):
     """
-    Main inference function.
+    INFERENCE — main inference function.
+
+    Accepts a ticker string (calls Kalshi API) or pre-fetched candle dict.
+    Runs the identical feature pipeline as training.
+    Returns current YES probability from the most recent candle.
 
     Args:
         ticker_or_raw  : ticker string OR pre-fetched {ticker: [candles]} dict
@@ -663,13 +624,9 @@ def _print_inference_result(r):
         print(f"    Hour {i+1:>2}: {p:.2%}  {bar}")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 22. FULL TRAINING PIPELINE
-# ══════════════════════════════════════════════════════════════════════════════
-
 def train_pipeline(source):
     """
-    Full pipeline from raw JSON to saved ensemble model.
+    FULL TRAINING PIPELINE — full pipeline from raw JSON to saved ensemble model.
 
     Args:
         source: dict, JSON file path, or directory of JSON files

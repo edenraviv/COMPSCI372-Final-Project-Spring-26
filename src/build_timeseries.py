@@ -5,17 +5,13 @@ from datetime import datetime
 from kalshi_client import KalshiClient
 from data_ingestion import write_to_file, read_from_json_file
 
-# -----------------------------
-# 3. Convert ISO string → Unix timestamp (int seconds)
-# -----------------------------
 def to_unix(ts_str: str) -> int:
+    '''Convert ISO string → Unix timestamp (int seconds).'''
     dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
     return int(dt.timestamp())
 
-# -----------------------------
-# 4. Convert candles response → DataFrame
-# -----------------------------
 def candles_to_df(response):
+    '''Convert candles response → DataFrame.'''
     if isinstance(response, dict):
         candles = response.get("candlesticks", [])  # was "candles"
     else:
@@ -33,10 +29,8 @@ def candles_to_df(response):
 
     return df.sort_values("ds").reset_index(drop=True)
 
-# -----------------------------
-# 5. Build ONE market time series
-# -----------------------------
 def build_market_series(client, raw_market, label_map):
+    '''Build ONE market time series.'''
     series_ticker = raw_market["event_ticker"]
     ticker = raw_market["ticker"]
 
@@ -88,10 +82,8 @@ def build_market_series(client, raw_market, label_map):
     return df
 
 
-# -----------------------------
-# 6. Build ALL markets
-# -----------------------------
 def build_all(client, raw_markets, processed_markets):
+    '''Build ALL markets.'''
     out = {}
 
     label_map = {
@@ -114,10 +106,8 @@ def build_all(client, raw_markets, processed_markets):
     return out
 
 
-# -----------------------------
-# 7. Save
-# -----------------------------
 def save(out, path="data/market_timeseries.json"):
+    '''Save time series to JSON file.'''
     serializable = {
         k: v.assign(ds=v["ds"].astype(str)).to_dict(orient="records")
         for k, v in out.items()
