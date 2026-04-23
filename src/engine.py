@@ -45,17 +45,16 @@ import pandas as pd
 import lightgbm as lgb
 import xgboost as xgb
 import shap
-import requests
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
 from pathlib import Path
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 from data_ingestion import load_raw
 from pre_processing import preprocess
+from kalshi_client import KalshiClient
 
 warnings.filterwarnings("ignore")
 
@@ -69,8 +68,6 @@ SCALER_PATH     = "kalshi_scaler.pkl"
 TRAIN_RATIO = 0.70
 VAL_RATIO   = 0.15
 TEST_RATIO  = 0.15
-
-KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. FLATTEN TO DATAFRAME
@@ -859,54 +856,60 @@ def load_models():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 20. KALSHI API — fetch live candles
+# 20. KALSHI API — fetch and format live candles
 #
-# Calls Kalshi REST API for a given ticker and returns candles in the same
-# structure as your training JSON, so the same feature pipeline applies.
+# Delegates the HTTP call to KalshiClient.get_candles (RSA-signed, with
+# series→historical fallback) and wraps the raw candles in the training-JSON
+# shape so the same feature pipeline applies.
 # ══════════════════════════════════════════════════════════════════════════════
 
-def get_candles(ticker: str, api_key: str = None) -> dict:
-    url     = f"{KALSHI_API_BASE}/markets/{ticker}/candlesticks"
-    params  = {"period_interval": 60}
-    headers = {"accept": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+def get_and_format_candles(ticker: str, series_ticker: str = None,
+                   start: int = None, end: int = None,
+                   period: int = 60) -> dict:
+    client = KalshiClient()
 
-    resp = requests.get(url, params=params, headers=headers, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
+    if end is None:
+        end = int(time.time())
+    if start is None:
+        start = end - 7 * 24 * 3600
 
-    candles = []
-    for c in data.get("candlesticks", []):
-        ts = c.get("end_period_ts_millis", 0) // 1000
-        candle = {
-            "ds":              pd.Timestamp(ts, unit="s").strftime(
-                               "%Y-%m-%d %H:%M:%S"),
-            "end_period_ts":   ts,
-            "close":           c.get("close", {}).get("yes_price"),
-            "high":            c.get("high",  {}).get("yes_price"),
-            "low":             c.get("low",   {}).get("yes_price"),
-            "volume_fp":       str(c.get("volume", 0)),
-            "open_interest_fp":str(c.get("open_interest", 0)),
+    raw_candles = client.get_candles(
+        series_ticker=series_ticker, ticker=ticker,
+        start=start, end=end, period=period,
+    )
+
+    formatted = []
+    for c in raw_candles:
+        ts = c.get("end_period_ts", 0)
+        ya = c.get("yes_ask") or {}
+        yb = c.get("yes_bid") or {}
+        pr = c.get("price")   or {}
+        formatted.append({
+            "ds":               pd.Timestamp(ts, unit="s").strftime("%Y-%m-%d %H:%M:%S"),
+            "end_period_ts":    ts,
+            "close":            _to_float(ya.get("close")),
+            "high":             _to_float(ya.get("high")),
+            "low":              _to_float(ya.get("low")),
+            "volume_fp":        str(c.get("volume", 0)),
+            "open_interest_fp": str(c.get("open_interest", 0)),
             "yes_ask": {
-                "close_dollars": c.get("yes_ask", {}).get("close"),
-                "high_dollars":  c.get("yes_ask", {}).get("high"),
-                "low_dollars":   c.get("yes_ask", {}).get("low"),
-                "open_dollars":  c.get("yes_ask", {}).get("open"),
+                "close_dollars": ya.get("close"),
+                "high_dollars":  ya.get("high"),
+                "low_dollars":   ya.get("low"),
+                "open_dollars":  ya.get("open"),
             },
             "yes_bid": {
-                "close_dollars": c.get("yes_bid", {}).get("close"),
-                "high_dollars":  c.get("yes_bid", {}).get("high"),
-                "low_dollars":   c.get("yes_bid", {}).get("low"),
-                "open_dollars":  c.get("yes_bid", {}).get("open"),
+                "close_dollars": yb.get("close"),
+                "high_dollars":  yb.get("high"),
+                "low_dollars":   yb.get("low"),
+                "open_dollars":  yb.get("open"),
             },
-            "price": {"mean_dollars": c.get("mean_price")},
+            "price": {"mean_dollars": pr.get("mean")},
             "market_id": ticker,
-            "label": None,  # unknown — this is what we're predicting
-        }
-        candles.append(candle)
+            "label":     None,
+        })
 
-    return {ticker: candles}
+    return {ticker: formatted}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -919,8 +922,7 @@ def get_candles(ticker: str, api_key: str = None) -> dict:
 
 def predict_live(ticker_or_raw,
                  lgbm_model=None, xgb_model=None,
-                 scaler=None, feature_cols=None,
-                 api_key=None):
+                 scaler=None, feature_cols=None):
     """
     Main inference function.
 
@@ -930,7 +932,6 @@ def predict_live(ticker_or_raw,
         xgb_model      : trained XGBoost Booster  (loaded from disk if None)
         scaler         : fitted StandardScaler     (loaded from disk if None)
         feature_cols   : list of feature names     (loaded from disk if None)
-        api_key        : Kalshi API key (optional)
 
     Returns dict:
         ticker          — market identifier
@@ -946,7 +947,7 @@ def predict_live(ticker_or_raw,
     if isinstance(ticker_or_raw, str):
         ticker = ticker_or_raw
         print(f"Fetching live candles for {ticker}...")
-        raw = get_candles(ticker, api_key=api_key)
+        raw = get_and_format_candles(ticker)
     else:
         raw    = ticker_or_raw
         ticker = list(raw.keys())[0]
