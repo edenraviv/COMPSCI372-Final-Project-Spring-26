@@ -38,6 +38,10 @@ wheels/
 # Data (raw & processed)
 # ========================
 data/
+plots/
+kalshi_lgbm.txt
+kalshi_xgb.json
+ablation_table.csv
 
 # Allow directory structure but not contents
 !data/raw/.gitkeep
