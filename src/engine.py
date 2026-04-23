@@ -450,7 +450,7 @@ def _plot_training_curves(all_evals: dict):
 
 def select_features(model, feature_cols: list,
                     X_val=None, y_val=None,
-                    threshold_pct: float = 0.01):
+                    threshold_pct: float = 0.001):
     imp   = pd.Series(model.feature_importance(importance_type="gain"),
                       index=feature_cols)
     total = imp.sum()
@@ -717,7 +717,7 @@ def shap_analysis(model, X_val: np.ndarray,
 # ══════════════════════════════════════════════════════════════════════════════
 
 def backtest(df_test: pd.DataFrame, probs: np.ndarray,
-             threshold: float = 0.65, stake: float = 1.0):
+             threshold: float = 0.55, stake: float = 1.0):
     df = df_test.copy().reset_index(drop=True)
     df["prob"]  = probs
     df["label"] = df["label"].values
