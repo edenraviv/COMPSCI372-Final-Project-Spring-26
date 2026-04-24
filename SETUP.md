@@ -84,7 +84,7 @@ python src/predict.py <series_ticker> <market_ticker>
 Example:
 
 ```bash
-python src/predict.py KXTRUMPMENTION KXTRUMPMENTION-26FEB19-AFRI
+python3 src/predict.py KXTRUMPMENTION KXTRUMPMENTION-26FEB19-AFRI
 ```
 
 The script fetches the latest candles from the Kalshi API, applies the saved scaler and feature pipeline, runs the LightGBM + XGBoost ensemble, and prints the current YES probability and signal. Models and scaler are loaded automatically from the artifacts produced in step 6 (`kalshi_lgbm.txt`, `kalshi_xgb.json`, `kalshi_scaler.pkl`).
