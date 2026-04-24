@@ -40,6 +40,8 @@ Install:
 import sys
 import warnings
 from pathlib import Path
+from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
+from candle_pre_processing import preprocess_no_clip, preprocess_no_flags
 
 import matplotlib
 matplotlib.use("Agg")
@@ -189,19 +191,11 @@ def train_pipeline(source):
 if __name__ == "__main__":
 
     # ── TRAINING ──────────────────────────────────────────────────────────────
-    # Swap SAMPLE_DATA for your real dataset:
-    #   train_pipeline("your_data.json")
-    #   train_pipeline("data/")   ← directory of JSON files
-
 
     lgbm_model, xgb_model, scaler, feature_cols = train_pipeline(DATA_SOURCE)
 
     # ── INFERENCE ─────────────────────────────────────────────────────────────
-    # Option A: live ticker → calls Kalshi API automatically
-    # result = predict_live("KXPOLITICSMENTION-26FEB18-NATO",
-    #                       api_key="YOUR_KEY")
 
-    # Option B: pre-fetched candles (no label field needed)
     live_candles = {
         "KXPOLITICSMENTION-26FEB18-NATO": [
             {"end_period_ts": 1771340400, "open_interest_fp": "0.00",
@@ -227,6 +221,72 @@ if __name__ == "__main__":
     result = predict_live(live_candles,
                           lgbm_model=lgbm_model, xgb_model=xgb_model,
                           scaler=scaler, feature_cols=feature_cols)
-
+    
     print(f"\nYES probability : {result['current_prob']:.1%}")
     print(f"Signal          : {result['signal']}")
+    
+
+    # ── PREPROCESSING EVIDENCE ───────────────────────────────────────────────────
+
+    def _quick_eval(df_in, label):
+        df_e = engineer_features(df_in)
+        df_e = df_e[df_e["hours_to_expiry"] > MIN_HOURS_TO_EXPIRY].dropna(subset=["label"])
+        fc   = [c for c in ALL_FEATURE_COLS if c in df_e.columns]
+        dtr, dv, dte = three_way_split(df_e)
+        Xtr, Xv, Xte, sc = scale_features(dtr, dv, dte, fc)
+        m = train_lgbm(Xtr, dtr["label"].values, Xv, dv["label"].values, fc)
+        p = m.predict(Xte)
+        y = dte["label"].values
+        print(f"  {label:<35} logloss={log_loss(y,p):.4f}  "
+              f"auc={roc_auc_score(y,p):.4f}  brier={brier_score_loss(y,p):.4f}")
+
+    print("\n── Preprocessing Impact Evidence ───────────────")
+    raw     = load_raw(DATA_SOURCE)
+    df_flat = flatten(raw)
+    df_flat = drop_resolution_candle(df_flat)
+    df_pre  = preprocess(df_flat.copy())
+
+    # Evidence 1: missing value flags
+    _quick_eval(preprocess_no_flags(df_flat.copy()), "No missing flags")
+    _quick_eval(df_pre.copy(),                        "With missing flags (full)")
+
+    # Evidence 2: >6h temporal filter
+    print()
+    df_eng_all = engineer_features(df_pre.copy())
+    df_eng_filtered = df_eng_all[df_eng_all["hours_to_expiry"] > MIN_HOURS_TO_EXPIRY].copy()
+
+    fc_all = [c for c in ALL_FEATURE_COLS if c in df_eng_all.columns]
+    fc_fil = [c for c in ALL_FEATURE_COLS if c in df_eng_filtered.columns]
+
+    # Without filter
+    df_all = df_eng_all.dropna(subset=["label"])
+    dtr, dv, dte = three_way_split(df_all)
+    Xtr, Xv, Xte, sc = scale_features(dtr, dv, dte, fc_all)
+    m = train_lgbm(Xtr, dtr["label"].values, Xv, dv["label"].values, fc_all)
+    p = m.predict(Xte)
+    y = dte["label"].values
+    import shap as shap_lib
+    ex  = shap_lib.TreeExplainer(m)
+    sv  = ex.shap_values(Xtr[:100])
+    sv  = sv[1] if isinstance(sv, list) else sv
+    top_no_filter = pd.Series(
+        abs(sv).mean(axis=0), index=fc_all).sort_values(ascending=False).index[0]
+    print(f"  {'No >6h filter':<35} logloss={log_loss(y,p):.4f}  "
+          f"auc={roc_auc_score(y,p):.4f}  top_shap={top_no_filter}")
+
+    # With filter
+    df_fil = df_eng_filtered.dropna(subset=["label"])
+    dtr, dv, dte = three_way_split(df_fil)
+    Xtr, Xv, Xte, sc = scale_features(dtr, dv, dte, fc_fil)
+    m = train_lgbm(Xtr, dtr["label"].values, Xv, dv["label"].values, fc_fil)
+    p = m.predict(Xte)
+    y = dte["label"].values
+    ex  = shap_lib.TreeExplainer(m)
+    sv  = ex.shap_values(Xtr[:100])
+    sv  = sv[1] if isinstance(sv, list) else sv
+    top_with_filter = pd.Series(
+        abs(sv).mean(axis=0), index=fc_fil).sort_values(ascending=False).index[0]
+    print(f"  {'With >6h filter':<35} logloss={log_loss(y,p):.4f}  "
+          f"auc={roc_auc_score(y,p):.4f}  top_shap={top_with_filter}")
+
+

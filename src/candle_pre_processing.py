@@ -127,3 +127,23 @@ def three_way_split(df: pd.DataFrame, seed: int = 42):
               f"{part['series_id'].nunique():>3} series | "
               f"{len(part)/n*100:.1f}%")
     return df_train, df_val, df_test
+
+def preprocess_no_clip(df: pd.DataFrame) -> pd.DataFrame:
+    """Preprocessing without outlier clipping — used for evidence comparison."""
+    df = df.copy()
+    for col in ["price_mean", "bid_close", "ask_close"]:
+        if col in df.columns:
+            df[f"{col}_missing"] = df[col].isna().astype(int)
+    return df
+
+
+def preprocess_no_flags(df: pd.DataFrame) -> pd.DataFrame:
+    """Preprocessing without missing flags — used for evidence comparison."""
+    df = df.copy()
+    for col in ["volume", "open_interest"]:
+        p99 = df.groupby("market_id")[col].transform(
+            lambda x: x.quantile(0.99))
+        df[col] = df[col].clip(upper=p99)
+    for col in ["price_mean_missing", "bid_close_missing", "ask_close_missing"]:
+        df[col] = 0
+    return df
