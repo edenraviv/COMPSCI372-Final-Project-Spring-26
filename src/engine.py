@@ -118,7 +118,7 @@ def train_pipeline(source):
     baseline_results = evaluate_baselines(df_train, df_val)
 
     # 10. Hyperparameter search via 5-fold GroupKFold CV on train+val
-    #     Grouped by market_id so no market straddles a fold boundary.
+    #     Grouped by series_id so no event series straddles a fold boundary.
     #     Robust to single-split noise; also reports per-config train/val gap
     #     as a direct overfitting diagnostic.
     print("\n── Hyperparameter Search (GroupKFold CV) ───────")

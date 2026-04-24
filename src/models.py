@@ -102,7 +102,8 @@ def hyperparam_search_cv(df_dev, feature_cols, n_splits=5, seed=42):
     '''HYPERPARAMETER TUNING via GroupKFold CV — robust config selection.
 
     Splits the dev set (train+val combined) into n_splits folds grouped by
-    market_id so no market appears in both fold-train and fold-val. Each
+    series_id so no event series straddles a fold boundary — prevents the
+    same multi-option event leaking from fold-train into fold-val. Each
     config is scored by mean val log-loss across folds. Selecting by CV
     rather than a single val split reduces the risk of tuning to one
     particular split and gives an uncertainty estimate (±std).
@@ -127,7 +128,7 @@ def hyperparam_search_cv(df_dev, feature_cols, n_splits=5, seed=42):
         "seed":         seed,
     }
 
-    groups = df_dev["market_id"].values
+    groups = df_dev["series_id"].values
     y_all  = df_dev["label"].values
     X_raw  = df_dev[feature_cols].fillna(-999).values
 

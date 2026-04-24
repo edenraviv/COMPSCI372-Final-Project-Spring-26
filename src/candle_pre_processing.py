@@ -14,12 +14,18 @@ def _to_float(val):
     
 
 def flatten(raw: dict) -> pd.DataFrame:
-    '''One row per candle. Extracts all price/volume/bid/ask fields.'''
+    '''One row per candle. Extracts all price/volume/bid/ask fields.
+
+    series_id strips the last "-suffix" off the market_id so all mutually
+    exclusive options under the same event share a group key. Used by the
+    splitters to keep an entire event in a single partition.'''
     rows = []
     for market_id, candles in raw.items():
+        series_id = market_id.rsplit("-", 1)[0]
         for c in candles:
             row = {
                 "market_id":     market_id,
+                "series_id":     series_id,
                 "ds":            pd.to_datetime(c["ds"]),
                 "close":         c.get("close"),
                 "high":          c.get("high"),
@@ -86,11 +92,14 @@ def drop_resolution_candle(df: pd.DataFrame) -> pd.DataFrame:
 
 def three_way_split(df: pd.DataFrame, seed: int = 42):
     '''TRAIN / VAL / TEST SPLIT — 70 / 15 / 15
-    GroupShuffleSplit ensures all candles from a market stay in one partition.
-    This prevents the model seeing future candles of a market in training while
-    Evaluating on earlier candles of the same market (temporal leakage).'''
-    
-    groups = df["market_id"].values
+    GroupShuffleSplit groups by series_id so all mutually exclusive option
+    markets under the same event stay in one partition. Splitting by
+    market_id alone leaks: e.g. if KXTRUMPMENTION-26FEB20-A is in train and
+    KXTRUMPMENTION-26FEB20-B is in val, the model can learn series-specific
+    price dynamics and complement structure (one option YES => others NO)
+    from train and exploit it on val.'''
+
+    groups = df["series_id"].values
 
     spl1 = GroupShuffleSplit(n_splits=1, test_size=TEST_RATIO,
                              random_state=seed)
@@ -102,7 +111,7 @@ def three_way_split(df: pd.DataFrame, seed: int = 42):
     spl2 = GroupShuffleSplit(n_splits=1, test_size=val_of_tv,
                              random_state=seed)
     tr_idx, val_idx = next(spl2.split(df_tv,
-                                      groups=df_tv["market_id"].values))
+                                      groups=df_tv["series_id"].values))
     df_train = df_tv.iloc[tr_idx]
     df_val   = df_tv.iloc[val_idx]
 
@@ -113,5 +122,6 @@ def three_way_split(df: pd.DataFrame, seed: int = 42):
                         ("Test",  df_test)]:
         print(f"  {name:<5}: {len(part):>5} rows | "
               f"{part['market_id'].nunique():>3} markets | "
+              f"{part['series_id'].nunique():>3} series | "
               f"{len(part)/n*100:.1f}%")
     return df_train, df_val, df_test
