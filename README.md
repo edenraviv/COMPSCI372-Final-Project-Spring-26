@@ -24,7 +24,7 @@ Full instructions (prerequisites, API key setup, troubleshooting) live in [SETUP
 
 ```bash
 # 1. Clone and enter the repo
-git clone https://github.com/<your-org>/COMPSCI372-Final-Project-Spring-26.git
+git clone https://github.com/edenraviv/COMPSCI372-Final-Project-Spring-26.git
 cd COMPSCI372-Final-Project-Spring-26
 
 # 2. Create a virtualenv and install dependencies
@@ -39,15 +39,12 @@ pip install -r requirements.txt
 # 4. Run the full pipeline: ingest → preprocess → train → evaluate
 python src/main.py
 ```
-
-Individual stages (`populate_datasets.py`, `build_timeseries.py`, `engine.py`) can also be run on their own — see [SETUP.md §7](SETUP.md). After training, predict a live market from the command line:
+After training, predict a live market from the command line:
 
 ```bash
 python src/predict.py <series_ticker> <market_ticker>
 # e.g. python src/predict.py KXTRUMPMENTION KXTRUMPMENTION-26FEB19-AFRI
 ```
-
-This fetches the latest candles from Kalshi, runs the saved LightGBM + XGBoost ensemble, and prints the current YES probability and signal ([src/predict.py](src/predict.py)).
 
 # Video Links:
 
