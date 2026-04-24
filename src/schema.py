@@ -44,7 +44,7 @@ FEATURE_GROUPS = {
     ],
     "level": [
         "close_is_floor", "close_is_ceiling",
-        "close_vs_open", "first_close", "running_std",
+        "close_vs_open",
     ],
     "raw": [
         "close", "ask_close", "bid_close", "open_interest", "volume",
