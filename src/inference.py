@@ -144,11 +144,7 @@ def _print_inference_result(r):
     print(f"\n{'═'*50}")
     print(f"  Ticker         : {r['ticker']}")
     print(f"  Candles seen   : {r['candles_seen']}")
-    print(f"  Hours to expiry: {r['hours_to_expiry']}")
     print(f"  YES probability: {r['current_prob']:.1%}")
     print(f"  Signal         : {r['signal']}")
     print(f"{'═'*50}")
-    print("  Probability over time:")
-    '''for i, p in enumerate(r["all_probs"]):
-        bar = "█" * int(p * 20)
-        print(f"    Hour {i+1:>2}: {p:.2%}  {bar}")'''
+
