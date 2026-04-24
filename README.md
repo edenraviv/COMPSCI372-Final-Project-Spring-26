@@ -53,5 +53,29 @@ Technical Video Link:
 
 # Evaluation:
 
+On the held-out test set (15% of markets, split by `series_id`), the final
+LightGBM + XGBoost ensemble achieves:
+
+| Model                     | Log-loss | AUC   | Brier |
+|---------------------------|----------|-------|-------|
+| Constant prior (baseline) |  0.6731  | 0.50  | 0.2400|
+| Market price (baseline)   |  0.4475  | 0.8786| 0.1208|
+| LightGBM                  |  0.6424  | 0.7489| 0.2192|
+| **Ensemble (LGBM + XGB)** |  0.6133  | 0.7537| 0.2109|
+
+
+The ensemble **does not consistently beat the market-price baseline**. All
+earlier iterations of the pipeline, trained either only on historical resolved
+markets and using a market-id (rather than series-id) split, reported AUC
+~0.92 and significantly outperformed market price. 
+
+![PnL: Ensemble of models trained on live and historical data](plots/backtest_pnl.png)
+
+**Where we think a real edge still exists:** early-life candles (6–24h to
+expiry) where the model's disagreement with market price is largest and
+liquidity is thinnest. The 6-hour expiry filter is set explicitly to
+force the model to learn from this window rather than from temporal
+certainty in the final hours.
+
 # Individual Contributions:
 When working on the project, we worked almost exclusively in meetings together. Sabina took the lead on file organization within our repository. The most time consuming part of our project was getting from API to static data file in processed form. Eden set up the API key, Sabina built the market data pipeline, and Eden worked to get the candlestick data. After building a full model pipeline together, Sabina addressed overfitting and debugged while Eden played around with some hyperparameter tuning. Finally, Sabina adapted the existing pipeline to allow user-inputs of live market tickers. Eden worked on video presentations and outlines.
