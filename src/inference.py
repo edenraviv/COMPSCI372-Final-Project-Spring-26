@@ -18,10 +18,8 @@ def get_and_format_candles(ticker: str, series_ticker: str = None,
 
     if end is None:
         end = int(time.time())
-        print(end)
     if start is None:
         start = end - 100 * 24 * 3600
-        print(start)
 
     if series_ticker is None:
         series_ticker = ticker.split("-", 1)[0]
@@ -152,6 +150,6 @@ def _print_inference_result(r):
     print(f"  Signal         : {r['signal']}")
     print(f"{'═'*50}")
     print("  Probability over time:")
-    for i, p in enumerate(r["all_probs"]):
+    '''for i, p in enumerate(r["all_probs"]):
         bar = "█" * int(p * 20)
-        print(f"    Hour {i+1:>2}: {p:.2%}  {bar}")
+        print(f"    Hour {i+1:>2}: {p:.2%}  {bar}")'''

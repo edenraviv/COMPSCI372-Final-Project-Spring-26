@@ -33,13 +33,13 @@ dist/
 *.egg
 .eggs/
 wheels/
+kalshi_lgbm.txt
 
 # ========================
 # Data (raw & processed)
 # ========================
 data/
 plots/
-kalshi_lgbm.txt
 kalshi_xgb.json
 ablation_table.csv
 
