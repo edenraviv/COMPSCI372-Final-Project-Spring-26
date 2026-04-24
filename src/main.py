@@ -11,14 +11,15 @@ Run from the project root:
     python src/main.py
 """
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config.settings import DATA_DIR, DATA_SOURCE
+
 import populate_datasets
 import build_timeseries
 import engine
-
-
-DATA_DIR        = Path("data")
-TIMESERIES_PATH = DATA_DIR / "market_timeseries.json"
 
 
 def ensure_data_dir():
@@ -47,7 +48,7 @@ def main():
 
     # Step 4 — preprocess, train, evaluate, save models
     print("\n[4/4] Training models...")
-    engine.train_pipeline(str(TIMESERIES_PATH))
+    engine.train_pipeline(DATA_SOURCE)
 
     print("\n✓ Pipeline complete.")
 

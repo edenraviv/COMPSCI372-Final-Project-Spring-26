@@ -1,7 +1,13 @@
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import log_loss
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config.settings import FEATURE_SELECTION_THRESHOLD
 from data_visualization import _plot_feature_importance
 
 
@@ -92,7 +98,7 @@ def scale_features(df_train, df_val, df_test, feature_cols):
 
 def select_features(model, feature_cols: list,
                     X_val=None, y_val=None,
-                    threshold_pct: float = 0.001):
+                    threshold_pct: float = FEATURE_SELECTION_THRESHOLD):
     '''FEATURE SELECTION — importance-based pruning with documented impact.
 
     After the initial model is trained, features contributing less than 1% of

@@ -1,10 +1,12 @@
+import sys
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import GroupShuffleSplit
 
-TRAIN_RATIO = 0.70
-VAL_RATIO   = 0.15
-TEST_RATIO  = 0.15
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config.settings import TRAIN_RATIO, VAL_RATIO, TEST_RATIO
 
 def _to_float(val):
     try:

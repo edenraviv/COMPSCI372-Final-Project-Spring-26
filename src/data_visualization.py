@@ -1,10 +1,11 @@
+import sys
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from pathlib import Path
 
-PLOTS_DIR = Path("plots")
-PLOTS_DIR.mkdir(exist_ok=True)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config.settings import PLOTS_DIR
 
 def _plot_feature_importance(imp: pd.Series, top_n: int = 20):
     imp_top = imp.sort_values(ascending=True).tail(top_n)

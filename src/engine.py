@@ -37,21 +37,32 @@ Install:
     pip install lightgbm xgboost pandas numpy scikit-learn shap matplotlib requests
 """
 
+import sys
 import warnings
+from pathlib import Path
+
 import matplotlib
 matplotlib.use("Agg")
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config.settings import (
+    BACKTEST_THRESHOLD,
+    DATA_SOURCE,
+    HYPERPARAM_CONFIGS,
+    MIN_HOURS_TO_EXPIRY,
+    PLOTS_DIR,
+)
 from data_ingestion import load_raw
 from candle_pre_processing import (preprocess, flatten,
                                    drop_resolution_candle, three_way_split)
 from features import engineer_features, scale_features, select_features
-from models import (HYPERPARAM_CONFIGS, hyperparam_search_cv,
+from models import (hyperparam_search_cv,
                     train_lgbm, train_xgboost, save_models)
 from evaluation import (evaluate_baselines, full_evaluate, backtest,
                         shap_analysis, ablation_study)
 from inference import predict_live
 from schema import ALL_FEATURE_COLS
-from data_visualization import PLOTS_DIR
 
 warnings.filterwarnings("ignore")
 
@@ -89,11 +100,12 @@ def train_pipeline(source):
 
     print(df["hours_to_expiry"].describe())
 
-    # Filter to candles with more than 6 hours remaining
+    # Filter to candles with more than MIN_HOURS_TO_EXPIRY hours remaining
     # Forces model to learn from price movement, not temporal certainty
     before = len(df)
-    df = df[df["hours_to_expiry"] > 6]
-    print(f"Rows after <6h filter: {len(df)} (dropped {before - len(df)})")
+    df = df[df["hours_to_expiry"] > MIN_HOURS_TO_EXPIRY]
+    print(f"Rows after <{MIN_HOURS_TO_EXPIRY}h filter: {len(df)} "
+          f"(dropped {before - len(df)})")
 
 
     # 6. Drop rows without a label
@@ -159,7 +171,7 @@ def train_pipeline(source):
         X_test_s, y_test, baseline_results)
 
     # 17. Backtesting simulation
-    backtest(df_test, ens_probs, threshold=0.60)
+    backtest(df_test, ens_probs, threshold=BACKTEST_THRESHOLD)
 
     # 18. Ablation study
     ablation_study(df_train, df_val, feature_cols)
@@ -167,7 +179,7 @@ def train_pipeline(source):
     # 19. Save
     save_models(lgbm_model, xgb_model, scaler_s, selected_cols)
 
-    print(f"\n✓ Done. Plots saved to ./{PLOTS_DIR}/")
+    print(f"\n✓ Done. Plots saved to {PLOTS_DIR}/")
     print("  training_curves.png | feature_importance.png | shap_summary.png")
     print("  error_analysis.png  | backtest_pnl.png       | ablation_table.csv")
 
@@ -182,7 +194,7 @@ if __name__ == "__main__":
     #   train_pipeline("data/")   ← directory of JSON files
 
 
-    lgbm_model, xgb_model, scaler, feature_cols = train_pipeline("data/market_timeseries.json")
+    lgbm_model, xgb_model, scaler, feature_cols = train_pipeline(DATA_SOURCE)
 
     # ── INFERENCE ─────────────────────────────────────────────────────────────
     # Option A: live ticker → calls Kalshi API automatically

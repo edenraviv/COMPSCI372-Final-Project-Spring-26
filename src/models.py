@@ -1,35 +1,22 @@
 import pickle
+import sys
+from pathlib import Path
+
 import numpy as np
 import lightgbm as lgb
 import xgboost as xgb
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config.settings import (
+    HYPERPARAM_CONFIGS,
+    MODEL_LGBM_PATH,
+    MODEL_XGB_PATH,
+    SCALER_PATH,
+)
 from data_visualization import _plot_training_curves
-
-
-MODEL_LGBM_PATH = "kalshi_lgbm.txt"
-MODEL_XGB_PATH  = "kalshi_xgb.json"
-SCALER_PATH     = "kalshi_scaler.pkl"
-
-
-HYPERPARAM_CONFIGS = {
-    "Config-A (default)": {
-        "learning_rate": 0.05, "num_leaves": 20,
-        "min_data_in_leaf": 10,  "lambda_l2": 1,
-        "feature_fraction": 0.8, "bagging_fraction": 0.8,
-    },
-    "Config-B (deep+reg)": {
-        "learning_rate": 0.02, "num_leaves": 50,
-        "min_data_in_leaf": 10, "lambda_l2": 5.0,
-        "feature_fraction": 0.7, "bagging_fraction": 0.7,
-    },
-    "Config-C (shallow+fast)": {
-        "learning_rate": 0.10, "num_leaves": 15,
-        "min_data_in_leaf": 20, "lambda_l2": 5.0,
-        "feature_fraction": 0.9, "bagging_fraction": 0.9,
-    },
-}
 
 
 def hyperparam_search(X_train, y_train, X_val, y_val, feature_cols):

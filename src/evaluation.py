@@ -1,15 +1,19 @@
-
+import sys
 import time
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 from sklearn.metrics import log_loss, roc_auc_score, brier_score_loss
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
-from schema import FEATURE_GROUPS
-from data_visualization import PLOTS_DIR
-from models import ensemble_predict
 import shap
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config.settings import PLOTS_DIR
+from schema import FEATURE_GROUPS
+from models import ensemble_predict
 
 
 def evaluate_baselines(df_train, df_val):

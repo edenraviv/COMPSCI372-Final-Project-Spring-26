@@ -1,20 +1,15 @@
-import os
-from dotenv import load_dotenv
-
-import os
+import sys
 import time
 import base64
+from datetime import datetime
+from pathlib import Path
+
 import requests
-from dotenv import load_dotenv
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-from datetime import datetime
 
-load_dotenv("apikey.env")
-
-API_KEY_ID = os.getenv("API_KEY_ID")
-PRIVATE_KEY_PATH = os.getenv("PRIVATE_KEY_PATH")
-BASE_URL = os.getenv("BASE_URL")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config.settings import API_KEY_ID, BASE_URL, PRIVATE_KEY_PATH
 
 
 class KalshiClient:
