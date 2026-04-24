@@ -57,7 +57,7 @@ python src/main.py
 This runs every stage in order:
 
 1. **Ensure `data/` exists** — creates the directory if it is missing.
-2. **`populate_datasets.run()`** — fetches all resolved political markets from Kalshi and writes `data/raw_market_data.json` and `data/processed_market_data.json`.
+2. **`populate_datasets.run()`** — fetches resolved political markets from Kalshi and writes `data/raw_market_data.json` and `data/processed_market_data.json`.
 3. **`build_timeseries.run()`** — fetches hourly candles for each market and writes `data/market_timeseries.json`.
 4. **`engine.train_pipeline()`** — runs preprocessing, feature engineering, hyperparameter search, training, evaluation, SHAP analysis, backtest, and ablation. Saves `kalshi_lgbm.txt`, `kalshi_xgb.json`, and `kalshi_scaler.pkl` to the project root, and evaluation plots to `plots/`.
 
