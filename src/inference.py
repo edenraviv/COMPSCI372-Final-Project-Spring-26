@@ -132,7 +132,6 @@ def predict_live(market_ticker_or_raw, series_ticker=None,
     result = {
         "ticker":          ticker,
         "current_prob":    round(current_prob, 4),
-        "hours_to_expiry": round(hours_remaining, 1) if hours_remaining else None,
         "candles_seen":    candles_seen,
         "all_probs":       [round(float(p), 4) for p in probs],
         "signal":          signal,
