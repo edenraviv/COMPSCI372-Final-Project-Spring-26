@@ -75,16 +75,19 @@ python src/engine.py              # stage 4 only (requires data/ already populat
 
 ## 8. Inference on a live market
 
-After training, use the inference helper to get a current YES probability:
+After training, predict a live market from the command line using `src/predict.py`. It takes two positional arguments — the Kalshi series ticker and the full market ticker:
 
-```python
-from inference import predict_live
-
-result = predict_live("KXPOLITICSMENTION-26FEB18-NATO")
-print(result["current_prob"], result["signal"])
+```bash
+python src/predict.py <series_ticker> <market_ticker>
 ```
 
-Models and scaler are loaded from disk automatically if not passed in.
+Example:
+
+```bash
+python src/predict.py KXTRUMPMENTION KXTRUMPMENTION-26FEB19-AFRI
+```
+
+The script fetches the latest candles from the Kalshi API, applies the saved scaler and feature pipeline, runs the LightGBM + XGBoost ensemble, and prints the current YES probability and signal. Models and scaler are loaded automatically from the artifacts produced in step 6 (`kalshi_lgbm.txt`, `kalshi_xgb.json`, `kalshi_scaler.pkl`).
 
 ## Troubleshooting
 

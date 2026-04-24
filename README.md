@@ -18,7 +18,36 @@ Under the hood it runs end-to-end:
 
 Tunable constants (paths, split ratios, thresholds, hyperparameter grid, API env) all live in [config/settings.py](config/settings.py) so the pipeline can be reconfigured without touching the source.
 
-# Quick Start: 
+# Quick Start:
+
+Full instructions (prerequisites, API key setup, troubleshooting) live in [SETUP.md](SETUP.md). The short version:
+
+```bash
+# 1. Clone and enter the repo
+git clone https://github.com/<your-org>/COMPSCI372-Final-Project-Spring-26.git
+cd COMPSCI372-Final-Project-Spring-26
+
+# 2. Create a virtualenv and install dependencies
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Add Kalshi credentials at the repo root (see SETUP.md §5)
+#    apikey.env  — API_KEY_ID, PRIVATE_KEY_PATH, BASE_URL
+#    kalshi_private_key.pem  — your downloaded private key
+
+# 4. Run the full pipeline: ingest → preprocess → train → evaluate
+python src/main.py
+```
+
+Individual stages (`populate_datasets.py`, `build_timeseries.py`, `engine.py`) can also be run on their own — see [SETUP.md §7](SETUP.md). After training, predict a live market from the command line:
+
+```bash
+python src/predict.py <series_ticker> <market_ticker>
+# e.g. python src/predict.py KXTRUMPMENTION KXTRUMPMENTION-26FEB19-AFRI
+```
+
+This fetches the latest candles from Kalshi, runs the saved LightGBM + XGBoost ensemble, and prints the current YES probability and signal ([src/predict.py](src/predict.py)).
 
 # Video Links:
 
