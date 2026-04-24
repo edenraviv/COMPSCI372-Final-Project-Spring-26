@@ -1,8 +1,7 @@
 # Predicting Political Event Markets on Kalshi
 Final Project for Duke Compsci 372, Intro to Applied Machine Learning, Sabina Eraso and Eden Raviv
 
-# Title: Making real-time predictions on live Kalshi political markets
-By feature engineering on top of LightGBM and XGBoost models and making  predictions on live markets, this project assesses feature significance for predicting the outcomes of ongoing political markets on Kalshi. Our project seeked to explore whether the [Efficient Market Hypothesis (EMH)](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://en.wikipedia.org/wiki/Efficient-market_hypothesis&ved=2ahUKEwjCgMKCqIWUAxX0kYkEHaeiBG4QFnoECBoQAQ&usg=AOvVaw2LNGamg7-PD2Bu_K6CrmBd) holds for political markets, or if an "edge" can be found by training a model on past political market time series data.
+By feature engineering on top of LightGBM and XGBoost models and making real-time predictions on live markets, this project assesses feature significance for predicting the outcomes of ongoing political markets on Kalshi. Among other goals, our project explores whether the [Efficient Market Hypothesis (EMH)](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://en.wikipedia.org/wiki/Efficient-market_hypothesis&ved=2ahUKEwjCgMKCqIWUAxX0kYkEHaeiBG4QFnoECBoQAQ&usg=AOvVaw2LNGamg7-PD2Bu_K6CrmBd) holds for political markets, or if an "edge" can be found by training a model on past political market time series data.
 
 # What it Does:
 
