@@ -15,13 +15,13 @@ SCALER_PATH     = "kalshi_scaler.pkl"
 
 HYPERPARAM_CONFIGS = {
     "Config-A (default)": {
-        "learning_rate": 0.05, "num_leaves": 31,
-        "min_data_in_leaf": 5,  "lambda_l2": 0.1,
+        "learning_rate": 0.05, "num_leaves": 20,
+        "min_data_in_leaf": 10,  "lambda_l2": 1,
         "feature_fraction": 0.8, "bagging_fraction": 0.8,
     },
     "Config-B (deep+reg)": {
-        "learning_rate": 0.02, "num_leaves": 63,
-        "min_data_in_leaf": 10, "lambda_l2": 1.0,
+        "learning_rate": 0.02, "num_leaves": 50,
+        "min_data_in_leaf": 10, "lambda_l2": 5.0,
         "feature_fraction": 0.7, "bagging_fraction": 0.7,
     },
     "Config-C (shallow+fast)": {
