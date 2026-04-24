@@ -52,7 +52,7 @@ python src/predict.py <series_ticker> <market_ticker>
 
 [Technical Video Link](videos/final_walkthrough.mp4)
 
-https://drive.google.com/drive/folders/1GgbqBDI_x_J75gTPXvTNJEd6J_24uWAT?usp=share_link
+[Drive containing both videos](https://drive.google.com/drive/folders/1GgbqBDI_x_J75gTPXvTNJEd6J_24uWAT?usp=share_link)
 
 # Evaluation:
 
