@@ -48,8 +48,8 @@ python src/predict.py <series_ticker> <market_ticker>
 
 # Video Links:
 
-Demo Link: 
-Technical Video Link:
+[Demo Link](videos/live_demo.mp4)
+[Technical Video Link](videos/final_walkthrough.mp4)
 
 # Evaluation:
 
